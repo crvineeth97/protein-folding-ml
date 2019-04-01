@@ -13,9 +13,9 @@ interface IMetricsProbs {
 class Metrics extends React.Component<IMetricsProbs, any> {
 
     // @ts-ignore
-    private setPdbData : any;
+    private setPdbData: any;
 
-    constructor(props: any){
+    constructor(props: any) {
         super(props);
         this.setPdbData = this.props.setPdbData;
     }
@@ -28,7 +28,7 @@ class Metrics extends React.Component<IMetricsProbs, any> {
         // @ts-ignore
         const ctx2 = document.getElementById("myChart2").getContext('2d');
 
-        const lineConfig =  {
+        const lineConfig = {
             data: {
                 datasets: [{
                     backgroundColor: 'rgb(255, 99, 132)',
@@ -126,7 +126,7 @@ class Metrics extends React.Component<IMetricsProbs, any> {
                     borderColor: 'rgb(255, 99, 132)',
                     data: [],
                     label: 'Actual',
-                },{
+                }, {
                     backgroundColor: 'rgb(54, 162, 235)',
                     borderColor: 'rgb(54, 162, 235)',
                     data: [],
@@ -167,7 +167,7 @@ class Metrics extends React.Component<IMetricsProbs, any> {
 
 
         function update_data(app: any) {
-            $.getJSON( "http://localhost:5000/graph", ( data ) => {
+            $.getJSON("http://localhost:5000/graph", (data) => {
                 connectionMade = true;
                 if (data == null) {
                     // @ts-ignore
@@ -175,15 +175,15 @@ class Metrics extends React.Component<IMetricsProbs, any> {
                     return;
                 }
 
-                app.setPdbData({true: data.pdb_data_true, pred: data.pdb_data_pred});
+                app.setPdbData({ true: data.pdb_data_true, pred: data.pdb_data_pred });
 
-                scatterConfig.data.datasets[0].data = data.phi_actual.map( (h: any, i: any) => {
+                scatterConfig.data.datasets[0].data = data.phi_actual.map((h: any, i: any) => {
                     return {
                         x: h,
                         y: data.psi_actual[i],
                     };
                 });
-                scatterConfig.data.datasets[1].data = data.phi_predicted.map( (h: any, i: any) => {
+                scatterConfig.data.datasets[1].data = data.phi_predicted.map((h: any, i: any) => {
                     return {
                         x: h,
                         y: data.psi_predicted[i],
@@ -191,19 +191,19 @@ class Metrics extends React.Component<IMetricsProbs, any> {
                 });
 
                 lineConfig.data.labels = data.sample_num
-                lineConfig.data.datasets[0].data = data.sample_num.map( (h: any, i: any) => {
+                lineConfig.data.datasets[0].data = data.sample_num.map((h: any, i: any) => {
                     return {
                         x: h,
                         y: data.train_loss_values[i],
                     };
                 });
-                lineConfig.data.datasets[1].data = data.sample_num.map( (h: any, i: any) => {
+                lineConfig.data.datasets[1].data = data.sample_num.map((h: any, i: any) => {
                     return {
                         x: h,
                         y: data.drmsd_avg[i],
                     };
                 });
-                lineConfig.data.datasets[2].data = data.sample_num.map( (h: any, i: any) => {
+                lineConfig.data.datasets[2].data = data.sample_num.map((h: any, i: any) => {
                     return {
                         x: h,
                         y: data.rmsd_avg[i],
@@ -212,13 +212,13 @@ class Metrics extends React.Component<IMetricsProbs, any> {
 
                 myChart.update();
                 myChart2.update();
-            } );
+            });
         }
 
         const updateDataInterval = window.setInterval(update_data, 1000, this);
 
         $.ajaxSetup({
-            "error":() => {
+            "error": () => {
                 if (connectionMade === true) {
                     clearInterval(updateDataInterval)
                     // console.log("Connection to server lost, NOT retrying")
@@ -228,16 +228,16 @@ class Metrics extends React.Component<IMetricsProbs, any> {
 
     }
 
-  public render() {
-      return (
-          <div className="Metrics">
-              <div className="chart-container" style={{width: "40vw", height: "100%"}}>
-                  <canvas id="myChart"  />
-                  <canvas id="myChart2"  />
-              </div>
-          </div>
-    );
-  }
+    public render() {
+        return (
+            <div className="Metrics">
+                <div className="chart-container" style={{ width: "40vw", height: "100%" }}>
+                    <canvas id="myChart" />
+                    <canvas id="myChart2" />
+                </div>
+            </div>
+        );
+    }
 }
 
 export default Metrics;

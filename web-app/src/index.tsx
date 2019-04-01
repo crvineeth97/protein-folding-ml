@@ -5,7 +5,7 @@ import './index.css';
 import registerServiceWorker from './registerServiceWorker';
 
 ReactDOM.render(
-  <App pdbData={{true: "", pred: ""}} />,
+  <App pdbData={{ true: "", pred: "" }} />,
   document.getElementById('root') as HTMLElement
 );
 registerServiceWorker();

@@ -4,7 +4,7 @@ import App from './App';
 
 it('renders without crashing', () => {
   const div = document.createElement('div');
-  ReactDOM.render(<App pdbData={{true: "", pred: ""}}/>, div);
+  ReactDOM.render(<App pdbData={{ true: "", pred: "" }} />, div);
   ReactDOM.unmountComponentAtNode(div);
 });
 

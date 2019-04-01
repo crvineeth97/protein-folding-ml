@@ -76,7 +76,7 @@ def point_to_coordinate(points, use_gpu, num_fragments=6):
     """
 
     # Compute optimal number of fragments if needed
-    total_num_angles = points.shape[0] # NUM_STEPS x NUM_DIHEDRALS
+    total_num_angles = points.shape[0]  # NUM_STEPS x NUM_DIHEDRALS
     if num_fragments is None:
         num_fragments = int(math.sqrt(total_num_angles))
 
@@ -85,22 +85,26 @@ def point_to_coordinate(points, use_gpu, num_fragments=6):
     Triplet = collections.namedtuple('Triplet', 'a, b, c')
     batch_size = points.shape[1]
     init_matrix = np.array([[-np.sqrt(1.0 / 2.0), np.sqrt(3.0 / 2.0), 0],
-                         [-np.sqrt(2.0), 0, 0], [0, 0, 0]],
-                        dtype=np.float32)
+                            [-np.sqrt(2.0), 0, 0], [0, 0, 0]],
+                           dtype=np.float32)
     init_matrix = torch.from_numpy(init_matrix)
     if use_gpu:
         init_matrix = init_matrix.cuda()
     init_coords = [row.repeat([num_fragments * batch_size, 1])
                       .view(num_fragments, batch_size, NUM_DIMENSIONS)
                    for row in init_matrix]
-    init_coords = Triplet(*init_coords)                                     # NUM_DIHEDRALS x [NUM_FRAGS, BATCH_SIZE, NUM_DIMENSIONS]
+    # NUM_DIHEDRALS x [NUM_FRAGS, BATCH_SIZE, NUM_DIMENSIONS]
+    init_coords = Triplet(*init_coords)
 
     # Pad points to yield equal-sized fragments
     padding = ((num_fragments - (total_num_angles % num_fragments))
                % num_fragments)                                             # (NUM_FRAGS x FRAG_SIZE) - (NUM_STEPS x NUM_DIHEDRALS)
-    points = F.pad(points, (0, 0, 0, 0, 0, padding))                        # [NUM_FRAGS x FRAG_SIZE, BATCH_SIZE, NUM_DIMENSIONS]
-    points = points.view(num_fragments, -1, batch_size, NUM_DIMENSIONS)     # [NUM_FRAGS, FRAG_SIZE, BATCH_SIZE, NUM_DIMENSIONS]
-    points = points.permute(1, 0, 2, 3)                                     # [FRAG_SIZE, NUM_FRAGS, BATCH_SIZE, NUM_DIMENSIONS]
+    # [NUM_FRAGS x FRAG_SIZE, BATCH_SIZE, NUM_DIMENSIONS]
+    points = F.pad(points, (0, 0, 0, 0, 0, padding))
+    # [NUM_FRAGS, FRAG_SIZE, BATCH_SIZE, NUM_DIMENSIONS]
+    points = points.view(num_fragments, -1, batch_size, NUM_DIMENSIONS)
+    # [FRAG_SIZE, NUM_FRAGS, BATCH_SIZE, NUM_DIMENSIONS]
+    points = points.permute(1, 0, 2, 3)
 
     # Extension function used for single atom reconstruction and whole fragment
     # alignment
@@ -136,7 +140,8 @@ def point_to_coordinate(points, use_gpu, num_fragments=6):
 
     # Loop over FRAG_SIZE in NUM_FRAGS parallel fragments, sequentially
     # generating the coordinates for each fragment across all batches
-    coords_list = [None] * points.shape[0]                                  # FRAG_SIZE x [NUM_FRAGS, BATCH_SIZE, NUM_DIMENSIONS]
+    # FRAG_SIZE x [NUM_FRAGS, BATCH_SIZE, NUM_DIMENSIONS]
+    coords_list = [None] * points.shape[0]
     prev_three_coords = init_coords
 
     for i in range(points.shape[0]):    # Iterate over FRAG_SIZE

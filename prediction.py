@@ -13,12 +13,15 @@ input_sequences = ["SRSLVISTINQISEDSKEFYFTLDNGKTMFPSNSQAWGGEKFENGQRAFVIFNELEQPVN
 model_path = "output/models/2019-01-30_00_38_46-TRAIN-LR0_01-MB1.model"
 
 model = torch.load(model_path)
-input_senquences_encoded = list(torch.LongTensor(encode_primary_string(aa)) for aa in input_sequences)
+input_senquences_encoded = list(torch.LongTensor(
+    encode_primary_string(aa)) for aa in input_sequences)
 
-predicted_dihedral_angles, predicted_backbone_atoms, batch_sizes = model(input_senquences_encoded)
+predicted_dihedral_angles, predicted_backbone_atoms, batch_sizes = model(
+    input_senquences_encoded)
 
 write_to_pdb(
-    get_structure_from_angles(input_senquences_encoded[0], predicted_dihedral_angles[:,0]),
+    get_structure_from_angles(
+        input_senquences_encoded[0], predicted_dihedral_angles[:, 0]),
     "myprediction"
 )
 
