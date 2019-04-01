@@ -35,14 +35,18 @@ def dihedral_to_point(dihedral, use_gpu, bond_lengths=BOND_LENGTHS,
 
     r_cos_theta = torch.tensor(bond_lengths * np.cos(np.pi - bond_angles))
     r_sin_theta = torch.tensor(bond_lengths * np.sin(np.pi - bond_angles))
+    dihedral_cos = torch.cos(dihedral)
+    dihedral_sin = torch.sin(dihedral)
 
     if use_gpu:
         r_cos_theta = r_cos_theta.cuda()
         r_sin_theta = r_sin_theta.cuda()
+        dihedral_cos = dihedral_cos.cuda()
+        dihedral_sin = dihedral_sin.cuda()
 
     point_x = r_cos_theta.view(1, 1, -1).repeat(num_steps, batch_size, 1)
-    point_y = torch.cos(dihedral) * r_sin_theta
-    point_z = torch.sin(dihedral) * r_sin_theta
+    point_y = dihedral_cos * r_sin_theta
+    point_z = dihedral_sin * r_sin_theta
 
     point = torch.stack([point_x, point_y, point_z])
     point_perm = point.permute(1, 3, 2, 0)
