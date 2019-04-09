@@ -9,7 +9,7 @@ import torch.utils.data
 import h5py
 from datetime import datetime
 import PeptideBuilder
-import Bio.PDB
+from Bio.PDB import PDBIO
 import math
 import numpy as np
 import time
@@ -44,7 +44,7 @@ class H5PytorchDataset(torch.utils.data.Dataset):
     def __len__(self):
         return self.num_proteins
 
-    def merge_samples_to_minibatch(samples):
+    def merge_samples_to_minibatch(self, samples):
         samples_list = []
         for s in samples:
             samples_list.append(s)
@@ -228,7 +228,7 @@ def get_structure_from_angles(aa_list_encoded, angles):
 
 
 def write_to_pdb(structure, prot_id):
-    out = Bio.PDB.PDBIO()
+    out = PDBIO()
     out.set_structure(structure)
     out.save("output/protein_" + str(prot_id) + ".pdb")
 

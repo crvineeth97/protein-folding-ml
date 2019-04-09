@@ -17,29 +17,6 @@ import torch
 MAX_SEQUENCE_LENGTH = 2000
 
 
-def process_raw_data(use_gpu, force_pre_processing_overwrite=True):
-    print("Starting pre-processing of raw data...")
-    input_files = glob.glob("data/raw/*")
-    input_files_filtered = filter_input_files(input_files)
-    for file_path in input_files_filtered:
-        filename = file_path.split('/')[-1]
-        preprocessed_file_name = "data/preprocessed/"+filename+".hdf5"
-
-        # check if we should remove the any previously processed files
-        if os.path.isfile(preprocessed_file_name):
-            print("Preprocessed file for " + filename + " already exists.")
-            if force_pre_processing_overwrite:
-                print(
-                    "force_pre_processing_overwrite flag set to True, overwriting old file...")
-                os.remove(preprocessed_file_name)
-            else:
-                print("Skipping pre-processing for this file...")
-
-        if not os.path.isfile(preprocessed_file_name):
-            process_file(filename, preprocessed_file_name, use_gpu)
-    print("Completed pre-processing.")
-
-
 def read_protein_from_file(file_pointer):
 
     dict_ = {}
@@ -165,3 +142,26 @@ def process_file(input_file, output_file, use_gpu):
 def filter_input_files(input_files):
     disallowed_file_endings = (".gitignore", ".DS_Store")
     return list(filter(lambda x: not x.endswith(disallowed_file_endings), input_files))
+
+
+def process_raw_data(use_gpu, force_pre_processing_overwrite=False):
+    print("Starting pre-processing of raw data...")
+    input_files = glob.glob("data/raw/*")
+    input_files_filtered = filter_input_files(input_files)
+    for file_path in input_files_filtered:
+        filename = file_path.split('/')[-1]
+        preprocessed_file_name = "data/preprocessed/"+filename+".hdf5"
+
+        # check if we should remove the any previously processed files
+        if os.path.isfile(preprocessed_file_name):
+            print("Preprocessed file for " + filename + " already exists.")
+            if force_pre_processing_overwrite:
+                print(
+                    "force_pre_processing_overwrite flag set to True, overwriting old file...")
+                os.remove(preprocessed_file_name)
+            else:
+                print("Skipping pre-processing for this file...")
+
+        if not os.path.isfile(preprocessed_file_name):
+            process_file(filename, preprocessed_file_name, use_gpu)
+    print("Completed pre-processing.")

@@ -32,7 +32,7 @@ parser.add_argument('--silent', dest='silent', action='store_true',
 parser.add_argument('--hide-ui', dest='hide_ui', action='store_true',
                     default=False, help='Hide loss graph and visualization UI while training goes on.')
 parser.add_argument('--evaluate-on-test', dest='evaluate_on_test', action='store_true',
-                    default=False, help='Run model of test data.')
+                    default=False, help='Run model on test data.')
 parser.add_argument('--eval-interval', dest='eval_interval', type=int,
                     default=5, help='Evaluate model on validation set every n minibatches.')
 parser.add_argument('--min-updates', dest='minimum_updates', type=int,
