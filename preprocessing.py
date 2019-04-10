@@ -23,20 +23,37 @@ def read_protein_from_file(file_pointer):
     _dssp_dict = {'L': 0, 'H': 1, 'B': 2,
                   'E': 3, 'G': 4, 'I': 5, 'T': 6, 'S': 7}
     _mask_dict = {'-': 0, '+': 1}
+    is_protein_info_correct = True
 
     while True:
+        if not is_protein_info_correct:
+            return {}
         next_line = file_pointer.readline()
         if next_line == '[ID]\n':
+            # ID of the protein
             id_ = file_pointer.readline()[:-1]
             dict_.update({'id': id_})
         elif next_line == '[PRIMARY]\n':
+            # Amino acid sequence of the protein
             primary = encode_primary_string(file_pointer.readline()[:-1])
+            seq_len = len(primary)
             dict_.update({'primary': primary})
+            # dict_.update({'sequence_length': seq_len})
         elif next_line == '[EVOLUTIONARY]\n':
+            # PSSM matrix + Information Content
+            # Dimensions: [21, Protein Length]
+            # First 20 rows represents the PSSM info of
+            # each amino acid in alphabetical order
+            # 21st row represents information content
             evolutionary = []
             for residue in range(21):
                 evolutionary.append(
                     [float(step) for step in file_pointer.readline().split()])
+                if len(evolutionary[-1]) != seq_len:
+                    print(
+                        "Error in evolutionary information of protein with id " + id_ + ". Skipping it")
+                    is_protein_info_correct = False
+                    break
             dict_.update({'evolutionary': evolutionary})
         elif next_line == '[SECONDARY]\n':
             secondary = list([_dssp_dict[dssp]
@@ -44,14 +61,30 @@ def read_protein_from_file(file_pointer):
             dict_.update({'secondary': secondary})
         elif next_line == '[TERTIARY]\n':
             tertiary = []
-            # 3 dimension
+            # The values are represented in picometers
+            # => Relative to PDB, multiply by 100
+            # Dimensions: [3, 3 * Protein Length]
+            # Eg: for protein of length 1
+            #      N       C_a       C
+            # X  2841.8,  2873.4,  2919.7
+            # Y  -864.7,  -957.9,  -877.0
+            # Z -6727.1, -6616.3, -6496.2
             for axis in range(3):
                 tertiary.append(
                     [float(coord) for coord in file_pointer.readline().split()])
+                if len(tertiary[-1]) != 3 * seq_len:
+                    print(
+                        "Error in tertiary information of protein with id " + id_ + ". Skipping it")
+                    is_protein_info_correct = False
+                    break
             dict_.update({'tertiary': tertiary})
         elif next_line == '[MASK]\n':
             mask = list([_mask_dict[aa]
                          for aa in file_pointer.readline()[:-1]])
+            if len(mask) != seq_len:
+                print(
+                    "Error in masking information of protein with id " + id_ + ". Skipping it")
+                is_protein_info_correct = False
             dict_.update({'mask': mask})
         elif next_line == '\n':
             return dict_
@@ -60,6 +93,8 @@ def read_protein_from_file(file_pointer):
 
 
 def process_file(input_file, output_file, use_gpu):
+    # FIXME Lots of unnecessary steps in this function
+    # Can be made simpler for just dataset creation
     print("Processing raw data file", input_file)
 
     # create output file
@@ -78,9 +113,13 @@ def process_file(input_file, output_file, use_gpu):
     while True:
         # while there's more proteins to process
         next_protein = read_protein_from_file(input_file_pointer)
+        if next_protein == {}:
+            continue
         if next_protein is None:
             break
+        # TODO: Figure out why this is required
         if current_buffer_allocaton >= current_buffer_size:
+            # Should be current_buffer_size + BATCH_SIZE
             current_buffer_size = current_buffer_size + 1
             dset1.resize((current_buffer_size, MAX_SEQUENCE_LENGTH))
             dset2.resize((current_buffer_size, MAX_SEQUENCE_LENGTH, 9))
@@ -108,6 +147,7 @@ def process_file(input_file, output_file, use_gpu):
             primary_padded).type(dtype=torch.long), mask)
         pos = torch.masked_select(torch.Tensor(tertiary_padded), mask).view(
             9, -1).transpose(0, 1).unsqueeze(1) / 100
+        # Dimensions of pos: [Protein Length, 1, 9]
 
         if use_gpu:
             pos = pos.cuda()
@@ -136,7 +176,7 @@ def process_file(input_file, output_file, use_gpu):
         dset3[current_buffer_allocaton] = mask_padded
         current_buffer_allocaton += 1
 
-    print("Wrote output to", current_buffer_allocaton, "proteins to", output_file)
+    print("Wrote output of ", current_buffer_allocaton, " proteins to ", output_file)
 
 
 def filter_input_files(input_files):

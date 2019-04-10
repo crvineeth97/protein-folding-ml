@@ -22,10 +22,11 @@ from util import contruct_dataloader_from_disk, set_experiment_id, write_out, \
     evaluate_model, write_model_to_disk, write_result_summary, write_to_pdb, calculate_dihedral_angels, \
     get_structure_from_angles, protein_id_to_str
 
-print("------------------------")
-print("--- OpenProtein v0.1 ---")
-print("------------------------")
+print("-----------------------")
+print("----- OpenProtein -----")
+print("-----------------------")
 
+# TODO Add more arguments
 parser = argparse.ArgumentParser(description="OpenProtein version 0.1")
 parser.add_argument('--silent', dest='silent', action='store_true',
                     help='Dont print verbose debug statements.')
@@ -54,6 +55,11 @@ if torch.cuda.is_available():
 # start web server
 start_dashboard_server()
 
+# Lots of unnecessary steps in this
+# Most importantly, the mask present is used and then the dihedral angles are calculated
+# For eg. take 1t38 PDB. It has missing residues between 36-55 position. Since the tertiary
+# information is masked, the 35th AA and the 56th AA are put together causing the wrong
+# dihedral angles to occur
 process_raw_data(use_gpu, force_pre_processing_overwrite=False)
 
 training_file = "data/preprocessed/training_30.hdf5"
