@@ -22,7 +22,7 @@ AA_ID_DICT = {'A': 1, 'C': 2, 'D': 3, 'E': 4, 'F': 5, 'G': 6, 'H': 7, 'I': 8, 'K
 
 def contruct_dataloader_from_disk(filename, minibatch_size):
     return torch.utils.data.DataLoader(H5PytorchDataset(filename), batch_size=minibatch_size,
-                                       shuffle=True, collate_fn=H5PytorchDataset.merge_samples_to_minibatch)
+                                       shuffle=True, collate_fn=merge_samples_to_minibatch)
 
 
 class H5PytorchDataset(torch.utils.data.Dataset):
@@ -44,13 +44,14 @@ class H5PytorchDataset(torch.utils.data.Dataset):
     def __len__(self):
         return self.num_proteins
 
-    def merge_samples_to_minibatch(self, samples):
-        samples_list = []
-        for s in samples:
-            samples_list.append(s)
-        # sort according to length of aa sequence
-        samples_list.sort(key=lambda x: len(x[0]), reverse=True)
-        return zip(*samples_list)
+
+def merge_samples_to_minibatch(samples):
+    samples_list = []
+    for s in samples:
+        samples_list.append(s)
+    # sort according to length of aa sequence
+    samples_list.sort(key=lambda x: len(x[0]), reverse=True)
+    return zip(*samples_list)
 
 
 def set_experiment_id(data_set_identifier, learning_rate, minibatch_size):
