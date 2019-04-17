@@ -93,19 +93,17 @@ def read_protein_from_file(file_pointer):
 
 
 def process_file(input_file, output_file, use_gpu):
-    # FIXME Lots of unnecessary steps in this function
-    # Can be made simpler for just dataset creation
     print("Processing raw data file", input_file)
-
+    # Means resize every 50 proteins
+    mini_batch_size = 50
+    idx = 0
     # create output file
     f = h5py.File(output_file, 'w')
-    current_buffer_size = 1
-    current_buffer_allocaton = 0
-    dset1 = f.create_dataset('primary', (current_buffer_size, MAX_SEQUENCE_LENGTH), maxshape=(
+    dset1 = f.create_dataset('primary', (mini_batch_size, MAX_SEQUENCE_LENGTH), maxshape=(
         None, MAX_SEQUENCE_LENGTH), dtype='int32')
-    dset2 = f.create_dataset('tertiary', (current_buffer_size, MAX_SEQUENCE_LENGTH, 9), maxshape=(
+    dset2 = f.create_dataset('tertiary', (mini_batch_size, MAX_SEQUENCE_LENGTH, 9), maxshape=(
         None, MAX_SEQUENCE_LENGTH, 9), dtype='float')
-    dset3 = f.create_dataset('mask', (current_buffer_size, MAX_SEQUENCE_LENGTH), maxshape=(
+    dset3 = f.create_dataset('mask', (mini_batch_size, MAX_SEQUENCE_LENGTH), maxshape=(
         None, MAX_SEQUENCE_LENGTH), dtype='uint8')
 
     input_file_pointer = open("data/raw/" + input_file, "r")
@@ -117,18 +115,11 @@ def process_file(input_file, output_file, use_gpu):
             continue
         if next_protein is None:
             break
-        # TODO: Figure out why this is required
-        if current_buffer_allocaton >= current_buffer_size:
-            # Should be current_buffer_size + BATCH_SIZE
-            current_buffer_size = current_buffer_size + 1
-            dset1.resize((current_buffer_size, MAX_SEQUENCE_LENGTH))
-            dset2.resize((current_buffer_size, MAX_SEQUENCE_LENGTH, 9))
-            dset3.resize((current_buffer_size, MAX_SEQUENCE_LENGTH))
 
         sequence_length = len(next_protein['primary'])
 
         if sequence_length > MAX_SEQUENCE_LENGTH:
-            print("Dropping protein as length too long:", sequence_length)
+            print("Dropping protein as length is too long:", sequence_length)
             continue
 
         primary_padded = np.zeros(MAX_SEQUENCE_LENGTH)
@@ -142,9 +133,16 @@ def process_file(input_file, output_file, use_gpu):
         tertiary_padded[:, :sequence_length] = t_reshaped
         mask_padded[:sequence_length] = next_protein['mask']
 
+        # The masked_select concats 2 unrelated amino acids
+        # and their dihedral angles are calculated, which should
+        # not be the case.
+        # TODO Figure out a way to solve this
         mask = torch.Tensor(mask_padded).type(dtype=torch.uint8)
         prim = torch.masked_select(torch.Tensor(
             primary_padded).type(dtype=torch.long), mask)
+        # Broadcasting works so masking will apply for all 9 rows
+        # Unsqueeze adds a 1 dimension at specified position
+        # Done so that the PNERF can work properly
         pos = torch.masked_select(torch.Tensor(tertiary_padded), mask).view(
             9, -1).transpose(0, 1).unsqueeze(1) / 100
         # Dimensions of pos: [Protein Length, 1, 9]
@@ -171,12 +169,19 @@ def process_file(input_file, output_file, use_gpu):
         mask_padded[:length_after_mask_removed] = np.ones(
             length_after_mask_removed)
 
-        dset1[current_buffer_allocaton] = primary_padded
-        dset2[current_buffer_allocaton] = tertiary_padded
-        dset3[current_buffer_allocaton] = mask_padded
-        current_buffer_allocaton += 1
+        dset1[idx] = primary_padded
+        dset2[idx] = tertiary_padded
+        dset3[idx] = mask_padded
+        idx += 1
 
-    print("Wrote output of ", current_buffer_allocaton, " proteins to ", output_file)
+        if idx % mini_batch_size == 0:
+            resize_shape = (idx / mini_batch_size + 1) * mini_batch_size
+            dset1.resize((resize_shape, MAX_SEQUENCE_LENGTH))
+            dset2.resize((resize_shape, MAX_SEQUENCE_LENGTH, 9))
+            dset3.resize((resize_shape, MAX_SEQUENCE_LENGTH))
+
+    print("Wrote output of ", idx + 1,
+          " proteins to ", output_file)
 
 
 def filter_input_files(input_files):

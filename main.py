@@ -54,7 +54,6 @@ args, unknown = parser.parse_known_args()
 use_gpu = False
 
 
-
 def train_model(data_set_identifier, train_file, val_file, learning_rate, minibatch_size):
     set_experiment_id(data_set_identifier, learning_rate, minibatch_size)
 
