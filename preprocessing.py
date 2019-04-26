@@ -137,37 +137,15 @@ def process_file(input_file, output_file, use_gpu):
         # and their dihedral angles are calculated, which should
         # not be the case.
         # TODO Figure out a way to solve this
-        mask = torch.Tensor(mask_padded).type(dtype=torch.uint8)
-        prim = torch.masked_select(torch.Tensor(
-            primary_padded).type(dtype=torch.long), mask)
+        # mask = torch.Tensor(mask_padded).type(dtype=torch.uint8)
+        # prim = torch.masked_select(torch.Tensor(
+        #     primary_padded).type(dtype=torch.long), mask)
         # Broadcasting works so masking will apply for all 9 rows
         # Unsqueeze adds a 1 dimension at specified position
         # Done so that the PNERF can work properly
-        pos = torch.masked_select(torch.Tensor(tertiary_padded), mask).view(
-            9, -1).transpose(0, 1).unsqueeze(1) / 100
+        # pos = torch.masked_select(torch.Tensor(tertiary_padded), mask).view(
+        #     9, -1).transpose(0, 1).unsqueeze(1) / 100
         # Dimensions of pos: [Protein Length, 1, 9]
-
-        if use_gpu:
-            pos = pos.cuda()
-
-        angles, batch_sizes = calculate_dihedral_angles_over_minibatch(
-            pos, [len(prim)], use_gpu=use_gpu)
-
-        tertiary, _ = get_backbone_positions_from_angular_prediction(
-            angles, batch_sizes, use_gpu=use_gpu)
-        tertiary = tertiary.squeeze(1)
-
-        primary_padded = np.zeros(MAX_SEQUENCE_LENGTH)
-        tertiary_padded = np.zeros((MAX_SEQUENCE_LENGTH, 9))
-
-        length_after_mask_removed = len(prim)
-
-        primary_padded[:length_after_mask_removed] = prim.data.cpu().numpy()
-        tertiary_padded[:length_after_mask_removed,
-                        :] = tertiary.data.cpu().numpy()
-        mask_padded = np.zeros(MAX_SEQUENCE_LENGTH)
-        mask_padded[:length_after_mask_removed] = np.ones(
-            length_after_mask_removed)
 
         dset1[idx] = primary_padded
         dset2[idx] = tertiary_padded
