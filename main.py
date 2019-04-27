@@ -4,65 +4,120 @@
 #
 # For license information, please see the LICENSE file in the root directory.
 
-from preprocessing import process_raw_data
-import torch
-import logging
-import torch.utils.data
-import h5py
-import torch.autograd as autograd
-import torch.optim as optim
 import argparse
-import numpy as np
-import time
-import requests
 import math
+import time
+
+import numpy as np
+import requests
+import torch
+import torch.optim as optim
+import torch.utils.data
+
 from dashboard import start_dashboard_server
+from models import ExampleModel
+from preprocessing import process_raw_data
+from util import (
+    calculate_dihedral_angels,
+    contruct_dataloader_from_disk,
+    evaluate_model,
+    get_structure_from_angles,
+    set_experiment_id,
+    write_model_to_disk,
+    write_out,
+    write_result_summary,
+    write_to_pdb,
+)
 
-from models import *
-from util import contruct_dataloader_from_disk, set_experiment_id, write_out, \
-    evaluate_model, write_model_to_disk, write_result_summary, write_to_pdb, calculate_dihedral_angels, \
-    get_structure_from_angles, protein_id_to_str
-
-print("--------------------------------------------------------------------------------")
-print("--------------------------------- OpenProtein ----------------------------------")
-print("--------------------------------------------------------------------------------")
+print("------------------------------------------------------------------")
+print("---------------------------- OpenProtein -------------------------")
+print("------------------------------------------------------------------")
 
 # TODO Add more arguments
 parser = argparse.ArgumentParser(description="OpenProtein version 0.1")
-parser.add_argument('--silent', dest='silent', action='store_true',
-                    help='Dont print verbose debug statements.')
-parser.add_argument('--hide-ui', dest='hide_ui', action='store_true',
-                    default=False, help='Hide loss graph and visualization UI while training goes on.')
-parser.add_argument('--evaluate-on-test', dest='evaluate_on_test', action='store_true',
-                    default=False, help='Run model on test data.')
-parser.add_argument('--eval-interval', dest='eval_interval', type=int,
-                    default=5, help='Evaluate model on validation set every n minibatches.')
-parser.add_argument('--min-updates', dest='minimum_updates', type=int,
-                    default=5000, help='Minimum number of minibatch iterations.')
-parser.add_argument('--minibatch-size', dest='minibatch_size', type=int,
-                    default=1, help='Size of each minibatch.')
-parser.add_argument('--learning-rate', dest='learning_rate', type=float,
-                    default=0.01, help='Learning rate to use during training.')
-parser.add_argument('--log-file', dest='log_file', type=str,
-                    default='./output/train.log', help='Print output to the given log file')
-parser.add_argument('--debug-mode', dest='debug_mode', action='store_true',
-                    default=False, help='Enter debugging mode for a more detailed log')
-parser.add_argument('--force-pre-processing-overwrite', dest='force_pre_processing_overwrite',
-                    action='store_true', default=False,
-                    help='Deletes already preprocessed data in data/preprocessed and uses the raw data again')
+parser.add_argument(
+    "--silent",
+    dest="silent",
+    action="store_true",
+    help="Dont print verbose debug statements.",
+)
+parser.add_argument(
+    "--hide-ui",
+    dest="hide_ui",
+    action="store_true",
+    default=False,
+    help="Hide loss graph and visualization UI while training goes on.",
+)
+parser.add_argument(
+    "--evaluate-on-test",
+    dest="evaluate_on_test",
+    action="store_true",
+    default=False,
+    help="Run model on test data.",
+)
+parser.add_argument(
+    "--eval-interval",
+    dest="eval_interval",
+    type=int,
+    default=5,
+    help="Evaluate model on validation set every n minibatches.",
+)
+parser.add_argument(
+    "--min-updates",
+    dest="minimum_updates",
+    type=int,
+    default=5000,
+    help="Minimum number of minibatch iterations.",
+)
+parser.add_argument(
+    "--minibatch-size",
+    dest="minibatch_size",
+    type=int,
+    default=1,
+    help="Size of each minibatch.",
+)
+parser.add_argument(
+    "--learning-rate",
+    dest="learning_rate",
+    type=float,
+    default=0.01,
+    help="Learning rate to use during training.",
+)
+parser.add_argument(
+    "--log-file",
+    dest="log_file",
+    type=str,
+    default="./output/train.log",
+    help="Print output to the given log file",
+)
+parser.add_argument(
+    "--debug-mode",
+    dest="debug_mode",
+    action="store_true",
+    default=False,
+    help="Enter debugging mode for a more detailed log",
+)
+parser.add_argument(
+    "--force-pre-processing-overwrite",
+    dest="force_pre_processing_overwrite",
+    action="store_true",
+    default=False,
+    help="Deletes already preprocessed data in data/preprocessed and uses the raw data again",
+)
 args, unknown = parser.parse_known_args()
 use_gpu = False
 
 
-def train_model(data_set_identifier, train_file, val_file, learning_rate, minibatch_size):
+def train_model(
+    data_set_identifier, train_file, val_file, learning_rate, minibatch_size
+):
     set_experiment_id(data_set_identifier, learning_rate, minibatch_size)
 
     train_loader = contruct_dataloader_from_disk(train_file, minibatch_size)
     validation_loader = contruct_dataloader_from_disk(val_file, minibatch_size)
     validation_dataset_size = validation_loader.dataset.__len__()
 
-    model = ExampleModel(21, minibatch_size,
-                         use_gpu=use_gpu)  # embed size = 21
+    model = ExampleModel(21, minibatch_size, use_gpu=use_gpu)
     if use_gpu:
         model = model.cuda()
 
@@ -95,13 +150,18 @@ def train_model(data_set_identifier, train_file, val_file, learning_rate, miniba
             loss.backward()
             loss_tracker = np.append(loss_tracker, float(loss))
             end = time.time()
-            write_out("Loss time:", start_compute_grad -
-                      start_compute_loss, "Grad time:", end-start_compute_grad)
+            write_out(
+                "Loss time:",
+                start_compute_grad - start_compute_loss,
+                "Grad time:",
+                end - start_compute_grad,
+            )
             optimizer.step()
             optimizer.zero_grad()
             model.zero_grad()
 
-            # for every eval_interval samples, plot performance on the validation set
+            # for every eval_interval samples,
+            # plot performance on the validation set
             if minibatches_proccesed % args.eval_interval == 0:
 
                 write_out("Testing model on validation set...")
@@ -109,7 +169,8 @@ def train_model(data_set_identifier, train_file, val_file, learning_rate, miniba
                 train_loss = loss_tracker.mean()
                 loss_tracker = np.zeros(0)
                 validation_loss, data_total, rmsd_avg, drmsd_avg = evaluate_model(
-                    validation_loader, model)
+                    validation_loader, model
+                )
                 prim = data_total[0][0]
                 pos = data_total[0][1]
                 pos_pred = data_total[0][3]
@@ -119,17 +180,21 @@ def train_model(data_set_identifier, train_file, val_file, learning_rate, miniba
                 angles = calculate_dihedral_angels(pos, use_gpu)
                 angles_pred = calculate_dihedral_angels(pos_pred, use_gpu)
                 write_to_pdb(get_structure_from_angles(prim, angles), "test")
-                write_to_pdb(get_structure_from_angles(
-                    prim, angles_pred), "test_pred")
+                write_to_pdb(get_structure_from_angles(prim, angles_pred), "test_pred")
                 if validation_loss < best_model_loss:
                     best_model_loss = validation_loss
                     best_model_minibatch_time = minibatches_proccesed
                     best_model_path = write_model_to_disk(model)
 
-                write_out("Validation loss:", validation_loss,
-                          "Train loss:", train_loss)
-                write_out("Best model so far (validation loss): ",
-                          validation_loss, "at time", best_model_minibatch_time)
+                write_out(
+                    "Validation loss:", validation_loss, "Train loss:", train_loss
+                )
+                write_out(
+                    "Best model so far (validation loss): ",
+                    validation_loss,
+                    "at time",
+                    best_model_minibatch_time,
+                )
                 write_out("Best model stored at " + best_model_path)
                 write_out("Minibatches processed:", minibatches_proccesed)
                 sample_num.append(minibatches_proccesed)
@@ -140,29 +205,35 @@ def train_model(data_set_identifier, train_file, val_file, learning_rate, miniba
                 if not args.hide_ui:
                     data = {}
                     data["pdb_data_pred"] = open(
-                        "output/protein_test_pred.pdb", "r").read()
-                    data["pdb_data_true"] = open(
-                        "output/protein_test.pdb", "r").read()
+                        "output/protein_test_pred.pdb", "r"
+                    ).read()
+                    data["pdb_data_true"] = open("output/protein_test.pdb", "r").read()
                     data["validation_dataset_size"] = validation_dataset_size
                     data["sample_num"] = sample_num
                     data["train_loss_values"] = train_loss_values
                     data["validation_loss_values"] = validation_loss_values
                     data["phi_actual"] = list(
-                        [math.degrees(float(v)) for v in angles[1:, 1]])
+                        [math.degrees(float(v)) for v in angles[1:, 1]]
+                    )
                     data["psi_actual"] = list(
-                        [math.degrees(float(v)) for v in angles[:-1, 2]])
+                        [math.degrees(float(v)) for v in angles[:-1, 2]]
+                    )
                     data["phi_predicted"] = list(
-                        [math.degrees(float(v)) for v in angles_pred[1:, 1]])
+                        [math.degrees(float(v)) for v in angles_pred[1:, 1]]
+                    )
                     data["psi_predicted"] = list(
-                        [math.degrees(float(v)) for v in angles_pred[:-1, 2]])
+                        [math.degrees(float(v)) for v in angles_pred[:-1, 2]]
+                    )
                     data["drmsd_avg"] = drmsd_avg_values
                     data["rmsd_avg"] = rmsd_avg_values
-                    res = requests.post(
-                        'http://localhost:5000/graph', json=data)
+                    res = requests.post("http://localhost:5000/graph", json=data)
                     if res.ok:
                         print(res.json())
 
-                if minibatches_proccesed > args.minimum_updates and minibatches_proccesed > best_model_minibatch_time * 2:
+                if (
+                    minibatches_proccesed > args.minimum_updates
+                    and minibatches_proccesed > best_model_minibatch_time * 2
+                ):
                     stopping_condition_met = True
                     break
     write_result_summary(best_model_loss)
@@ -182,18 +253,19 @@ def main():
     start_dashboard_server()
 
     # FIXME Lots of unnecessary steps in this
-    # Most importantly, the mask present is used and then the dihedral angles are calculated
-    # For eg. take 1t38 PDB. It has missing residues between 36-55 position. Since the tertiary
-    # information is masked, the 35th AA and the 56th AA are put together causing the wrong
-    # dihedral angles to occur
+    # Most importantly, the mask present is used and then the dihedral angles
+    # are calculated. For eg. take 1t38 PDB. It has missing residues between
+    # 36-55 position. Since the tertiary information is masked, the 35th AA and
+    # the 56th AA are put together causing the wrong dihedral angles to occur
     process_raw_data(use_gpu, force_pre_processing_overwrite=False)
 
     training_file = "data/preprocessed/training_30.hdf5"
     validation_file = "data/preprocessed/validation.hdf5"
-    testing_file = "data/preprocessed/testing.hdf5"
+    # testing_file = "data/preprocessed/testing.hdf5"
 
     train_model_path = train_model(
-        "TRAIN", training_file, validation_file, args.learning_rate, args.minibatch_size)
+        "TRAIN", training_file, validation_file, args.learning_rate, args.minibatch_size
+    )
 
     print(train_model_path)
 
