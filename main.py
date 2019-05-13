@@ -1,6 +1,8 @@
 # This file is part of the OpenProtein project.
+# Modified for research usage
 #
 # @author Jeppe Hallgren
+# @author Vineeth Chelur
 #
 # For license information, please see the LICENSE file in the root directory.
 
@@ -248,7 +250,7 @@ def main():
         write_out("CUDA is available, using GPU")
         use_gpu = True
 
-    # start web server
+    # Start web server
     # TODO Add more options to view as well as use GDT_TS for scoring
     start_dashboard_server()
 

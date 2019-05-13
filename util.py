@@ -40,6 +40,9 @@ AA_ID_DICT = {
     "Y": 20,
 }
 
+DSSP_DICT = {"L": 0, "H": 1, "B": 2, "E": 3, "G": 4, "I": 5, "T": 6, "S": 7}
+MASK_DICT = {"-": 0, "+": 1}
+
 
 def contruct_dataloader_from_disk(filename, minibatch_size):
     return torch.utils.data.DataLoader(
@@ -493,3 +496,80 @@ def pass_messages(aa_features, message_transformation, use_gpu):
     transformed = message_transformation(aa_msg_pairs).view(aa_count, aa_count - 1, -1)
     transformed_sum = transformed.sum(dim=1)  # aa_count x output message size
     return transformed_sum
+
+
+def masked_select(data, mask, X=None):
+    """
+    This masked_select works slightly differently.
+    In the mask, there'll be a chain of 0s, all of these are not selected
+    Instead, they are replaced by a single value defined by X
+    This shows that the protein is discontinuous and we should not consider all
+    the amino acids as continuous after masking
+    Eg: data = [A, C, D, E, F, G, H, I, K, L, M, N] => Assume all are chars 'A'
+        mask = [1, 1, 0, 0, 0, 1, 1, 1, 0, 1, 1, 1]
+        X = 'X'
+        output = [A, C, X, G, H, I, X, L, M, N]
+        Without X, the output would mean that C and G are adjacent and therefore the
+        calculations of backbone angles will go wrong
+    """
+    output = []
+    for i, val in enumerate(mask):
+        if val == 1:
+            if i != 0 and mask[i - 1] == 0 and X is not None:
+                output.append(X)
+            output.append(data[i])
+    return output
+
+
+def calculate_dihedral_from_points(points):
+    # Source: https://math.stackexchange.com/questions/47059/how-do-i-calculate-a-dihedral-angle-given-cartesian-coordinates
+    b = np.zeros((3, 3))
+    n = np.zeros((2, 3))
+    for i in range(1, 4):
+        b[i - 1] = points[i] - points[i - 1]
+    for i in range(1, 3):
+        tmp = np.cross(b[i - 1], b[i])
+        n[i - 1] = tmp / np.linalg.norm(tmp)
+    m = np.cross(n[0], b[1] / np.linalg.norm(b[1]))
+    x = np.dot(n[0], n[1])
+    y = np.dot(m, n[1])
+    return -np.arctan2(y, x)
+
+
+def calculate_phi_from_masked_tertiary(tertiary_masked):
+    flg = 0
+    phi = []
+    for i, aa in enumerate(tertiary_masked):
+        if flg == 0:
+            flg = 1
+            phi.append(0)
+            continue
+        # If there were missing residues
+        if np.allclose(aa, np.zeros(9)):
+            flg = 0
+            continue
+        points = np.zeros((4, 3))
+        points[0] = tertiary_masked[i - 1][6:]
+        points[1:] = np.reshape(aa, (3, 3))
+        phi.append(calculate_dihedral_from_points(points))
+    return np.array(phi) * 180.0 / np.pi
+
+
+def calculate_psi_from_masked_tertiary(tertiary_masked):
+    flg = 1
+    psi = []
+    sz = len(tertiary_masked)
+    for i, aa in enumerate(tertiary_masked):
+        if flg == 0:
+            flg = 1
+            continue
+        # If there were missing residues
+        if i + 1 == sz or np.allclose(tertiary_masked[i + 1], np.zeros(9)):
+            flg = 0
+            psi.append(0)
+            continue
+        points = np.zeros((4, 3))
+        points[0:3] = np.reshape(aa, (3, 3))
+        points[3] = tertiary_masked[i + 1][:3]
+        psi.append(calculate_dihedral_from_points(points))
+    return np.array(psi) * 180.0 / np.pi

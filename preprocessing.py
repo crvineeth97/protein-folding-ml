@@ -10,12 +10,14 @@ import os.path
 
 import h5py
 import numpy as np
-import torch
 
 from util import (
-    calculate_dihedral_angles_over_minibatch,
     encode_primary_string,
-    get_backbone_positions_from_angular_prediction,
+    DSSP_DICT,
+    MASK_DICT,
+    masked_select,
+    calculate_phi_from_masked_tertiary,
+    calculate_psi_from_masked_tertiary,
 )
 
 MAX_SEQUENCE_LENGTH = 2000
@@ -24,8 +26,7 @@ MAX_SEQUENCE_LENGTH = 2000
 def read_protein_from_file(file_pointer):
 
     dict_ = {}
-    _dssp_dict = {"L": 0, "H": 1, "B": 2, "E": 3, "G": 4, "I": 5, "T": 6, "S": 7}
-    _mask_dict = {"-": 0, "+": 1}
+
     is_protein_info_correct = True
 
     while True:
@@ -41,7 +42,6 @@ def read_protein_from_file(file_pointer):
             primary = encode_primary_string(file_pointer.readline()[:-1])
             seq_len = len(primary)
             dict_.update({"primary": primary})
-            # dict_.update({'sequence_length': seq_len})
         elif next_line == "[EVOLUTIONARY]\n":
             # PSSM matrix + Information Content
             # Dimensions: [21, Protein Length]
@@ -63,9 +63,7 @@ def read_protein_from_file(file_pointer):
                     break
             dict_.update({"evolutionary": evolutionary})
         elif next_line == "[SECONDARY]\n":
-            secondary = list(
-                [_dssp_dict[dssp] for dssp in file_pointer.readline()[:-1]]
-            )
+            secondary = list([DSSP_DICT[dssp] for dssp in file_pointer.readline()[:-1]])
             dict_.update({"secondary": secondary})
         elif next_line == "[TERTIARY]\n":
             tertiary = []
@@ -91,7 +89,7 @@ def read_protein_from_file(file_pointer):
                     break
             dict_.update({"tertiary": tertiary})
         elif next_line == "[MASK]\n":
-            mask = list([_mask_dict[aa] for aa in file_pointer.readline()[:-1]])
+            mask = list([MASK_DICT[aa] for aa in file_pointer.readline()[:-1]])
             if len(mask) != seq_len:
                 print(
                     "Error in masking information of protein with id "
@@ -113,6 +111,8 @@ def process_file(input_file, output_file, use_gpu):
     idx = 0
     # create output file
     f = h5py.File(output_file, "w")
+    # The following variables are datasets of the h5py file
+    # Can add more information if available
     dset1 = f.create_dataset(
         "primary",
         (mini_batch_size, MAX_SEQUENCE_LENGTH),
@@ -120,74 +120,118 @@ def process_file(input_file, output_file, use_gpu):
         dtype="int32",
     )
     dset2 = f.create_dataset(
-        "tertiary",
-        (mini_batch_size, MAX_SEQUENCE_LENGTH, 9),
-        maxshape=(None, MAX_SEQUENCE_LENGTH, 9),
+        "evolutionary",
+        (mini_batch_size, MAX_SEQUENCE_LENGTH, 21),
+        maxshape=(None, MAX_SEQUENCE_LENGTH, 21),
         dtype="float",
     )
-    dset3 = f.create_dataset(
-        "mask",
+    # No secondary information available in ProteinNet
+    # Skipping this for now
+    # dset3 = f.create_dataset(
+    #     "secondary",
+    #     (mini_batch_size, MAX_SEQUENCE_LENGTH),
+    #     maxshape=(None, MAX_SEQUENCE_LENGTH),
+    #     dtype="uint8",
+    # )
+    # Instead of storing tertiary data, let us store the phi, psi angles
+    # dset4 = f.create_dataset(
+    #     "tertiary",
+    #     (mini_batch_size, MAX_SEQUENCE_LENGTH, 9),
+    #     maxshape=(None, MAX_SEQUENCE_LENGTH, 9),
+    #     dtype="float",
+    # )
+    dset4 = f.create_dataset(
+        "phi",
         (mini_batch_size, MAX_SEQUENCE_LENGTH),
         maxshape=(None, MAX_SEQUENCE_LENGTH),
-        dtype="uint8",
+        dtype="float",
     )
+    dset5 = f.create_dataset(
+        "psi",
+        (mini_batch_size, MAX_SEQUENCE_LENGTH),
+        maxshape=(None, MAX_SEQUENCE_LENGTH),
+        dtype="float",
+    )
+    # No need to store the masks
+    # dset5 = f.create_dataset(
+    #     "mask",
+    #     (mini_batch_size, MAX_SEQUENCE_LENGTH),
+    #     maxshape=(None, MAX_SEQUENCE_LENGTH),
+    #     dtype="uint8",
+    # )
 
     input_file_pointer = open("data/raw/" + input_file, "r")
 
     while True:
-        # while there's more proteins to process
-        next_protein = read_protein_from_file(input_file_pointer)
-        if next_protein == {}:
+        # While there's more proteins to process
+        protein = read_protein_from_file(input_file_pointer)
+        if protein == {}:
             continue
-        if next_protein is None:
+        if protein is None:
             break
 
-        sequence_length = len(next_protein["primary"])
+        sequence_length = len(protein["primary"])
 
         if sequence_length > MAX_SEQUENCE_LENGTH:
-            print("Dropping protein as length is too long:", sequence_length)
+            print(
+                f"Protein {protein[id]} is too large and will not be considered. Length = {sequence_length}"
+            )
             continue
 
+        primary_masked = masked_select(protein["primary"], protein["mask"])
+        evolutionary_reshaped = np.array(protein["evolutionary"]).T
+        evolutionary_masked = masked_select(evolutionary_reshaped, protein["mask"])
+        # secondary_masked = masked_select(protein["secondary"], protein["mask"])
+        tertiary_transposed = np.ravel(np.array(protein["tertiary"]).T)
+        tertiary_reshaped = (
+            np.reshape(tertiary_transposed, (sequence_length, 9)).T / 100.0
+        )
+        # Putting np.zeros(9) as a signal of missing residues
+        tertiary_masked = masked_select(tertiary_reshaped, protein["mask"], np.zeros(9))
+
+        masked_length = len(primary_masked)
+
         primary_padded = np.zeros(MAX_SEQUENCE_LENGTH)
-        tertiary_padded = np.zeros((9, MAX_SEQUENCE_LENGTH))
-        mask_padded = np.zeros(MAX_SEQUENCE_LENGTH)
+        evolutionary_padded = np.zeros(21, MAX_SEQUENCE_LENGTH)
+        # secondary_padded = np.zeros(MAX_SEQUENCE_LENGTH)
+        phi_padded = np.zeros(MAX_SEQUENCE_LENGTH)
+        psi_padded = np.zeros(MAX_SEQUENCE_LENGTH)
 
-        primary_padded[:sequence_length] = next_protein["primary"]
-        t_transposed = np.ravel(np.array(next_protein["tertiary"]).T)
-        t_reshaped = np.reshape(t_transposed, (sequence_length, 9)).T
-
-        tertiary_padded[:, :sequence_length] = t_reshaped
-        mask_padded[:sequence_length] = next_protein["mask"]
-
-        # The masked_select concats 2 unrelated amino acids
-        # and their dihedral angles are calculated, which should
-        # not be the case.
-        # TODO Figure out a way to solve this
-        # mask = torch.Tensor(mask_padded).type(dtype=torch.uint8)
-        # prim = torch.masked_select(torch.Tensor(
-        #     primary_padded).type(dtype=torch.long), mask)
-        # Broadcasting works so masking will apply for all 9 rows
-        # Unsqueeze adds a 1 dimension at specified position
-        # Done so that the PNERF can work properly
-        # pos = torch.masked_select(torch.Tensor(tertiary_padded), mask).view(
-        #     9, -1).transpose(0, 1).unsqueeze(1) / 100
-        # Dimensions of pos: [Protein Length, 1, 9]
+        primary_padded[:masked_length] = primary_masked
+        evolutionary_padded[:masked_length] = evolutionary_masked
+        assert len(evolutionary_masked) == masked_length
+        # secondary_padded[:masked_length] = secondary_masked
+        # assert len(secondary_masked) == masked_length
+        phi = calculate_phi_from_masked_tertiary(tertiary_masked)
+        assert len(phi) == masked_length
+        phi_padded[:masked_length] = phi
+        psi = calculate_psi_from_masked_tertiary(tertiary_masked)
+        assert len(psi) == masked_length
+        psi_padded[:masked_length] = psi
 
         dset1[idx] = primary_padded
-        dset2[idx] = tertiary_padded
-        dset3[idx] = mask_padded
+        dset2[idx] = evolutionary_padded
+        # dset3[idx] = secondary_padded
+        dset4[idx] = phi_padded
+        dset5[idx] = psi_padded
         idx += 1
 
         if idx % mini_batch_size == 0:
             resize_shape = (idx / mini_batch_size + 1) * mini_batch_size
             dset1.resize((resize_shape, MAX_SEQUENCE_LENGTH))
-            dset2.resize((resize_shape, MAX_SEQUENCE_LENGTH, 9))
-            dset3.resize((resize_shape, MAX_SEQUENCE_LENGTH))
+            dset2.resize((resize_shape, MAX_SEQUENCE_LENGTH, 21))
+            # dset3.resize((resize_shape, MAX_SEQUENCE_LENGTH))
+            dset4.resize((resize_shape, MAX_SEQUENCE_LENGTH))
+            dset5.resize((resize_shape, MAX_SEQUENCE_LENGTH))
 
     print("Wrote output of ", idx + 1, " proteins to ", output_file)
 
 
 def filter_input_files(input_files):
+    """
+    Returns a list of files that do not have the provided
+    file_endings from the provided list of files
+    """
     disallowed_file_endings = (".gitignore", ".DS_Store")
     return list(filter(lambda x: not x.endswith(disallowed_file_endings), input_files))
 
