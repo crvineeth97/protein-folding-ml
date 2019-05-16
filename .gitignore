@@ -108,3 +108,6 @@ output/
 
 # VS Code Configuration
 .vscode
+
+# Extra outputs from specific steps or extra code not needed
+extras

@@ -7,6 +7,7 @@
 import math
 import time
 from datetime import datetime
+import warnings
 
 import h5py
 import numpy as np
@@ -17,6 +18,7 @@ from PeptideBuilder import make_structure
 
 import pnerf.pnerf as pnerf
 
+warnings.filterwarnings("error")
 AA_ID_DICT = {
     "A": 1,
     "C": 2,
@@ -61,13 +63,18 @@ class H5PytorchDataset(torch.utils.data.Dataset):
         self.num_proteins, self.max_sequence_len = self.h5pyfile["primary"].shape
 
     def __getitem__(self, index):
-        mask = torch.Tensor(self.h5pyfile["mask"][index, :]).type(dtype=torch.uint8)
-        prim = torch.masked_select(
-            torch.Tensor(self.h5pyfile["primary"][index, :]).type(dtype=torch.long),
-            mask,
+        primary = torch.tensor(self.h5pyfile["primary"][index, :]).type(
+            dtype=torch.uint8
         )
-        tertiary = torch.Tensor(self.h5pyfile["tertiary"][index][: int(mask.sum())])
-        return prim, tertiary, mask
+        evolutionary = torch.tensor(self.h5pyfile["evolutionary"][index, :]).type(
+            dtype=torch.float
+        )
+        # secondary = torch.tensor(self.h5pyfile["secondary"][index, :]).type(
+        #     dtype=torch.uint8
+        # )
+        phi = torch.tensor(self.h5pyfile["phi"][index, :]).type(dtype=torch.float)
+        psi = torch.tensor(self.h5pyfile["psi"][index, :]).type(dtype=torch.float)
+        return primary, evolutionary, phi, psi
 
     def __len__(self):
         return self.num_proteins
@@ -518,7 +525,7 @@ def masked_select(data, mask, X=None):
             if i != 0 and mask[i - 1] == 0 and X is not None:
                 output.append(X)
             output.append(data[i])
-    return output
+    return np.array(output)
 
 
 def calculate_dihedral_from_points(points):
@@ -529,7 +536,10 @@ def calculate_dihedral_from_points(points):
         b[i - 1] = points[i] - points[i - 1]
     for i in range(1, 3):
         tmp = np.cross(b[i - 1], b[i])
-        n[i - 1] = tmp / np.linalg.norm(tmp)
+        try:
+            n[i - 1] = tmp / np.linalg.norm(tmp)
+        except RuntimeWarning:
+            print("M", end="")
     m = np.cross(n[0], b[1] / np.linalg.norm(b[1]))
     x = np.dot(n[0], n[1])
     y = np.dot(m, n[1])
@@ -540,13 +550,13 @@ def calculate_phi_from_masked_tertiary(tertiary_masked):
     flg = 0
     phi = []
     for i, aa in enumerate(tertiary_masked):
-        if flg == 0:
-            flg = 1
-            phi.append(0)
-            continue
         # If there were missing residues
         if np.allclose(aa, np.zeros(9)):
             flg = 0
+            continue
+        if flg == 0:
+            flg = 1
+            phi.append(0)
             continue
         points = np.zeros((4, 3))
         points[0] = tertiary_masked[i - 1][6:]
@@ -560,13 +570,13 @@ def calculate_psi_from_masked_tertiary(tertiary_masked):
     psi = []
     sz = len(tertiary_masked)
     for i, aa in enumerate(tertiary_masked):
-        if flg == 0:
-            flg = 1
-            continue
         # If there were missing residues
         if i + 1 == sz or np.allclose(tertiary_masked[i + 1], np.zeros(9)):
             flg = 0
             psi.append(0)
+            continue
+        if flg == 0:
+            flg = 1
             continue
         points = np.zeros((4, 3))
         points[0:3] = np.reshape(aa, (3, 3))

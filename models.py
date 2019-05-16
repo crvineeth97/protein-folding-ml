@@ -21,7 +21,7 @@ from util import (
 )
 
 # seed random generator for reproducibility
-torch.manual_seed(1)
+torch.manual_seed(42)
 
 # sample model borrowed from
 # https://github.com/lblaabjerg/Master/blob/master/Models%20and%20processed%20data/ProteinNet_LSTM_500.py

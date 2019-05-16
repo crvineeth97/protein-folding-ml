@@ -174,25 +174,44 @@ def process_file(input_file, output_file, use_gpu):
 
         if sequence_length > MAX_SEQUENCE_LENGTH:
             print(
-                f"Protein {protein[id]} is too large and will not be considered. Length = {sequence_length}"
+                "Protein "
+                + protein["id"]
+                + " is too large and will not be considered. Length = "
+                + str(sequence_length)
             )
             continue
-
         primary_masked = masked_select(protein["primary"], protein["mask"])
         evolutionary_reshaped = np.array(protein["evolutionary"]).T
         evolutionary_masked = masked_select(evolutionary_reshaped, protein["mask"])
         # secondary_masked = masked_select(protein["secondary"], protein["mask"])
         tertiary_transposed = np.ravel(np.array(protein["tertiary"]).T)
         tertiary_reshaped = (
-            np.reshape(tertiary_transposed, (sequence_length, 9)).T / 100.0
+            np.reshape(tertiary_transposed, (sequence_length, 9)) / 100.0
         )
         # Putting np.zeros(9) as a signal of missing residues
         tertiary_masked = masked_select(tertiary_reshaped, protein["mask"], np.zeros(9))
+        # If the first few residues were missing, no need to consider them
+        if np.allclose(tertiary_masked[0], np.zeros(9)):
+            tertiary_masked = tertiary_masked[1:]
+        # There are problems with some of the proteins in the dataset
+        # Skip if that is the case
+        skip_flg = 0
+        for coords in tertiary_masked:
+            if not np.allclose(coords, np.zeros(9)) and (
+                np.allclose(coords[:3], np.zeros(3))
+                or np.allclose(coords[3:6], np.zeros(3))
+                or np.allclose(coords[6:], np.zeros(3))
+            ):
+                skip_flg = 1
+                break
+        if skip_flg:
+            continue
 
+        print(protein["id"])
         masked_length = len(primary_masked)
 
         primary_padded = np.zeros(MAX_SEQUENCE_LENGTH)
-        evolutionary_padded = np.zeros(21, MAX_SEQUENCE_LENGTH)
+        evolutionary_padded = np.zeros((MAX_SEQUENCE_LENGTH, 21))
         # secondary_padded = np.zeros(MAX_SEQUENCE_LENGTH)
         phi_padded = np.zeros(MAX_SEQUENCE_LENGTH)
         psi_padded = np.zeros(MAX_SEQUENCE_LENGTH)
@@ -224,7 +243,8 @@ def process_file(input_file, output_file, use_gpu):
             dset4.resize((resize_shape, MAX_SEQUENCE_LENGTH))
             dset5.resize((resize_shape, MAX_SEQUENCE_LENGTH))
 
-    print("Wrote output of ", idx + 1, " proteins to ", output_file)
+    input_file_pointer.close()
+    print("Wrote output of ", idx, " proteins to ", output_file)
 
 
 def filter_input_files(input_files):

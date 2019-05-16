@@ -106,8 +106,6 @@ parser.add_argument(
     default=False,
     help="Deletes already preprocessed data in data/preprocessed and uses the raw data again",
 )
-args, unknown = parser.parse_known_args()
-use_gpu = False
 
 
 def train_model(
@@ -144,9 +142,9 @@ def train_model(
         loss_tracker = np.zeros(0)
         for minibatch_id, training_minibatch in enumerate(train_loader, 0):
             minibatches_proccesed += 1
-            primary_sequence, tertiary_positions, mask = training_minibatch
+            primary, evolutionary, phi, psi = training_minibatch
             start_compute_loss = time.time()
-            loss = model.compute_loss(primary_sequence, tertiary_positions)
+            loss = model.compute_loss(primary, tertiary_positions)
             write_out("Train loss:", float(loss))
             start_compute_grad = time.time()
             loss.backward()
@@ -164,7 +162,7 @@ def train_model(
 
             # for every eval_interval samples,
             # plot performance on the validation set
-            if minibatches_proccesed % args.eval_interval == 0:
+            if minibatches_proccesed % ARGS.eval_interval == 0:
 
                 write_out("Testing model on validation set...")
 
@@ -204,7 +202,7 @@ def train_model(
                 validation_loss_values.append(validation_loss)
                 rmsd_avg_values.append(rmsd_avg)
                 drmsd_avg_values.append(drmsd_avg)
-                if not args.hide_ui:
+                if not ARGS.hide_ui:
                     data = {}
                     data["pdb_data_pred"] = open(
                         "output/protein_test_pred.pdb", "r"
@@ -233,7 +231,7 @@ def train_model(
                         print(res.json())
 
                 if (
-                    minibatches_proccesed > args.minimum_updates
+                    minibatches_proccesed > ARGS.minimum_updates
                     and minibatches_proccesed > best_model_minibatch_time * 2
                 ):
                     stopping_condition_met = True
@@ -242,35 +240,29 @@ def train_model(
     return best_model_path
 
 
-def main():
-    if args.hide_ui:
-        write_out("Live plot deactivated, see output folder for plot.")
+ARGS = parser.parse_known_args()[0]
+use_gpu = False
 
-    if torch.cuda.is_available():
-        write_out("CUDA is available, using GPU")
-        use_gpu = True
+if ARGS.hide_ui:
+    write_out("Live plot deactivated, see output folder for plot.")
 
-    # Start web server
-    # TODO Add more options to view as well as use GDT_TS for scoring
+if torch.cuda.is_available():
+    write_out("CUDA is available, using GPU")
+    use_gpu = True
+
+# Start web server
+# TODO Add more options to view as well as use GDT_TS for scoring
+if not ARGS.hide_ui:
     start_dashboard_server()
 
-    # FIXME Lots of unnecessary steps in this
-    # Most importantly, the mask present is used and then the dihedral angles
-    # are calculated. For eg. take 1t38 PDB. It has missing residues between
-    # 36-55 position. Since the tertiary information is masked, the 35th AA and
-    # the 56th AA are put together causing the wrong dihedral angles to occur
-    process_raw_data(use_gpu, force_pre_processing_overwrite=False)
+process_raw_data(use_gpu, force_pre_processing_overwrite=False)
 
-    training_file = "data/preprocessed/training_30.hdf5"
-    validation_file = "data/preprocessed/validation.hdf5"
-    # testing_file = "data/preprocessed/testing.hdf5"
+training_file = "data/preprocessed/training_30.hdf5"
+validation_file = "data/preprocessed/validation.hdf5"
+# testing_file = "data/preprocessed/testing.hdf5"
 
-    train_model_path = train_model(
-        "TRAIN", training_file, validation_file, args.learning_rate, args.minibatch_size
-    )
+train_model_path = train_model(
+    "TRAIN", training_file, validation_file, ARGS.learning_rate, ARGS.minibatch_size
+)
 
-    print(train_model_path)
-
-
-if __name__ == "__main__":
-    main()
+print(train_model_path)
