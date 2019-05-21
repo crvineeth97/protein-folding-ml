@@ -17,7 +17,7 @@ import torch.optim as optim
 import torch.utils.data
 
 from dashboard import start_dashboard_server
-from models import ExampleModel
+from models import LSTMModel
 from preprocessing import process_raw_data
 from util import (
     calculate_dihedral_angels,
@@ -117,12 +117,10 @@ def train_model(
     validation_loader = contruct_dataloader_from_disk(val_file, minibatch_size)
     validation_dataset_size = validation_loader.dataset.__len__()
 
-    model = ExampleModel(21, minibatch_size, use_gpu=use_gpu)
-    if use_gpu:
-        model = model.cuda()
+    model = LSTMModel(21, minibatch_size, device)
 
-    # TODO: is soft_to_angle.parameters() included here?
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+    criterion = torch.nn.MSELoss()
 
     sample_num = list()
     train_loss_values = list()
@@ -137,28 +135,35 @@ def train_model(
     minibatches_proccesed = 0
 
     while not stopping_condition_met:
-        optimizer.zero_grad()
-        model.zero_grad()
         loss_tracker = np.zeros(0)
         for minibatch_id, training_minibatch in enumerate(train_loader, 0):
             minibatches_proccesed += 1
-            primary, evolutionary, phi, psi = training_minibatch
+            lengths, primary, evolutionary, phi, psi = training_minibatch
             start_compute_loss = time.time()
-            loss = model.compute_loss(primary, tertiary_positions)
-            write_out("Train loss:", float(loss))
+            # inp should be the feature vectors to send to the particular model
+            # primary is of shape [minibatch_size, MAX_SEQ_LEN]
+            inp = model.generate_input(primary, evolutionary, lengths)
+            # output of the model
+            # In our case: sin(phi), cos(phi), sin(psi), cos(psi)
+            output = model(inp)
+            target = torch.tensor(
+                [torch.sin(phi), torch.cos(phi), torch.sin(psi), torch.cos(psi)],
+                device=device,
+            )
+            loss = criterion(output, target)
+            optimizer.zero_grad()
+            write_out("Train loss:", loss.item())
             start_compute_grad = time.time()
             loss.backward()
-            loss_tracker = np.append(loss_tracker, float(loss))
+            loss_tracker = np.append(loss_tracker, loss.item())
             end = time.time()
             write_out(
-                "Loss time:",
+                "Loss time: ",
                 start_compute_grad - start_compute_loss,
-                "Grad time:",
+                "Grad time: ",
                 end - start_compute_grad,
             )
             optimizer.step()
-            optimizer.zero_grad()
-            model.zero_grad()
 
             # for every eval_interval samples,
             # plot performance on the validation set
@@ -174,11 +179,8 @@ def train_model(
                 prim = data_total[0][0]
                 pos = data_total[0][1]
                 pos_pred = data_total[0][3]
-                if use_gpu:
-                    pos = pos.cuda()
-                    pos_pred = pos_pred.cuda()
-                angles = calculate_dihedral_angels(pos, use_gpu)
-                angles_pred = calculate_dihedral_angels(pos_pred, use_gpu)
+                angles = calculate_dihedral_angels(pos, device)
+                angles_pred = calculate_dihedral_angels(pos_pred, device)
                 write_to_pdb(get_structure_from_angles(prim, angles), "test")
                 write_to_pdb(get_structure_from_angles(prim, angles_pred), "test_pred")
                 if validation_loss < best_model_loss:
@@ -241,21 +243,21 @@ def train_model(
 
 
 ARGS = parser.parse_known_args()[0]
-use_gpu = False
+device = torch.device("cpu")
 
 if ARGS.hide_ui:
     write_out("Live plot deactivated, see output folder for plot.")
 
 if torch.cuda.is_available():
     write_out("CUDA is available, using GPU")
-    use_gpu = True
+    device = torch.device("cuda")
 
 # Start web server
 # TODO Add more options to view as well as use GDT_TS for scoring
 if not ARGS.hide_ui:
     start_dashboard_server()
 
-process_raw_data(use_gpu, force_pre_processing_overwrite=False)
+process_raw_data(force_pre_processing_overwrite=False)
 
 training_file = "data/preprocessed/training_30.hdf5"
 validation_file = "data/preprocessed/validation.hdf5"

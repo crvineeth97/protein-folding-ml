@@ -104,7 +104,7 @@ def read_protein_from_file(file_pointer):
             return None
 
 
-def process_file(input_file, output_file, use_gpu):
+def process_file(input_file, output_file):
     print("Processing raw data file", input_file)
     # Means resize every 50 proteins
     mini_batch_size = 50
@@ -113,11 +113,14 @@ def process_file(input_file, output_file, use_gpu):
     f = h5py.File(output_file, "w")
     # The following variables are datasets of the h5py file
     # Can add more information if available
+    dsetl = f.create_dataset(
+        "length", (mini_batch_size, 1), maxshape=(None, 1), dtype="int32"
+    )
     dset1 = f.create_dataset(
         "primary",
         (mini_batch_size, MAX_SEQUENCE_LENGTH),
         maxshape=(None, MAX_SEQUENCE_LENGTH),
-        dtype="int32",
+        dtype="uint8",
     )
     dset2 = f.create_dataset(
         "evolutionary",
@@ -228,6 +231,7 @@ def process_file(input_file, output_file, use_gpu):
         assert len(psi) == masked_length
         psi_padded[:masked_length] = psi
 
+        dsetl[idx] = [masked_length]
         dset1[idx] = primary_padded
         dset2[idx] = evolutionary_padded
         # dset3[idx] = secondary_padded
@@ -237,6 +241,7 @@ def process_file(input_file, output_file, use_gpu):
 
         if idx % mini_batch_size == 0:
             resize_shape = (idx / mini_batch_size + 1) * mini_batch_size
+            dsetl.resize((resize_shape, 1))
             dset1.resize((resize_shape, MAX_SEQUENCE_LENGTH))
             dset2.resize((resize_shape, MAX_SEQUENCE_LENGTH, 21))
             # dset3.resize((resize_shape, MAX_SEQUENCE_LENGTH))
@@ -256,7 +261,7 @@ def filter_input_files(input_files):
     return list(filter(lambda x: not x.endswith(disallowed_file_endings), input_files))
 
 
-def process_raw_data(use_gpu, force_pre_processing_overwrite=False):
+def process_raw_data(force_pre_processing_overwrite=False):
     print("Starting pre-processing of raw data...")
     input_files = glob.glob("data/raw/*")
     input_files_filtered = filter_input_files(input_files)
@@ -276,5 +281,5 @@ def process_raw_data(use_gpu, force_pre_processing_overwrite=False):
                 print("Skipping pre-processing for this file...")
 
         if not os.path.isfile(preprocessed_file_name):
-            process_file(filename, preprocessed_file_name, use_gpu)
+            process_file(filename, preprocessed_file_name)
     print("Completed pre-processing.")

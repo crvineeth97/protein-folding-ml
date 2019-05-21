@@ -20,35 +20,35 @@ import pnerf.pnerf as pnerf
 
 warnings.filterwarnings("error")
 AA_ID_DICT = {
-    "A": 1,
-    "C": 2,
-    "D": 3,
-    "E": 4,
-    "F": 5,
-    "G": 6,
-    "H": 7,
-    "I": 8,
-    "K": 9,
-    "L": 10,
-    "M": 11,
-    "N": 12,
-    "P": 13,
-    "Q": 14,
-    "R": 15,
-    "S": 16,
-    "T": 17,
-    "V": 18,
-    "W": 19,
-    "Y": 20,
+    "A": 0,
+    "C": 1,
+    "D": 2,
+    "E": 3,
+    "F": 4,
+    "G": 5,
+    "H": 6,
+    "I": 7,
+    "K": 8,
+    "L": 9,
+    "M": 10,
+    "N": 11,
+    "P": 12,
+    "Q": 13,
+    "R": 14,
+    "S": 15,
+    "T": 16,
+    "V": 17,
+    "W": 18,
+    "Y": 19,
 }
 
 DSSP_DICT = {"L": 0, "H": 1, "B": 2, "E": 3, "G": 4, "I": 5, "T": 6, "S": 7}
 MASK_DICT = {"-": 0, "+": 1}
 
 
-def contruct_dataloader_from_disk(filename, minibatch_size):
+def contruct_dataloader_from_disk(filename, minibatch_size, device):
     return torch.utils.data.DataLoader(
-        H5PytorchDataset(filename),
+        H5PytorchDataset(filename, device),
         batch_size=minibatch_size,
         shuffle=True,
         collate_fn=merge_samples_to_minibatch,
@@ -56,25 +56,35 @@ def contruct_dataloader_from_disk(filename, minibatch_size):
 
 
 class H5PytorchDataset(torch.utils.data.Dataset):
-    def __init__(self, filename):
+    def __init__(self, filename, device):
         super(H5PytorchDataset, self).__init__()
 
         self.h5pyfile = h5py.File(filename, "r")
+        self.device = device
         self.num_proteins, self.max_sequence_len = self.h5pyfile["primary"].shape
 
     def __getitem__(self, index):
-        primary = torch.tensor(self.h5pyfile["primary"][index, :]).type(
-            dtype=torch.uint8
+        lengths = torch.tensor(
+            self.h5pyfile["length"][index, :], dtype=torch.int32, device=self.device
         )
-        evolutionary = torch.tensor(self.h5pyfile["evolutionary"][index, :]).type(
-            dtype=torch.float
+        primary = torch.tensor(
+            self.h5pyfile["primary"][index, :], dtype=torch.uint8, device=self.device
         )
-        # secondary = torch.tensor(self.h5pyfile["secondary"][index, :]).type(
-        #     dtype=torch.uint8
+        evolutionary = torch.tensor(
+            self.h5pyfile["evolutionary"][index, :],
+            dtype=torch.float,
+            device=self.device,
+        )
+        # secondary = torch.tensor(
+        #     self.h5pyfile["secondary"][index, :], dtype=torch.uint8, device=self.device
         # )
-        phi = torch.tensor(self.h5pyfile["phi"][index, :]).type(dtype=torch.float)
-        psi = torch.tensor(self.h5pyfile["psi"][index, :]).type(dtype=torch.float)
-        return primary, evolutionary, phi, psi
+        phi = torch.tensor(
+            self.h5pyfile["phi"][index, :], dtype=torch.float, device=self.device
+        )
+        psi = torch.tensor(
+            self.h5pyfile["psi"][index, :], dtype=torch.float, device=self.device
+        )
+        return lengths, primary, evolutionary, phi, psi
 
     def __len__(self):
         return self.num_proteins
@@ -228,14 +238,12 @@ def write_result_summary(accuracy):
     print(output_string, end="")
 
 
-def calculate_dihedral_angles_over_minibatch(
-    atomic_coords_padded, batch_sizes, use_gpu
-):
+def calculate_dihedral_angles_over_minibatch(atomic_coords_padded, batch_sizes, device):
     angles = []
     atomic_coords = atomic_coords_padded.transpose(0, 1)
     for idx, _ in enumerate(batch_sizes):
         angles.append(
-            calculate_dihedral_angels(atomic_coords[idx][: batch_sizes[idx]], use_gpu)
+            calculate_dihedral_angels(atomic_coords[idx][: batch_sizes[idx]], device)
         )
     return torch.nn.utils.rnn.pad_packed_sequence(
         torch.nn.utils.rnn.pack_sequence(angles)
@@ -251,14 +259,12 @@ def protein_id_to_str(protein_id_list):
     return aa_list
 
 
-def calculate_dihedral_angels(atomic_coords, use_gpu):
+def calculate_dihedral_angels(atomic_coords, device):
 
     assert int(atomic_coords.shape[1]) == 9
     atomic_coords = atomic_coords.contiguous().view(-1, 3)
 
-    zero_tensor = torch.tensor(0.0)
-    if use_gpu:
-        zero_tensor = zero_tensor.cuda()
+    zero_tensor = torch.tensor(0.0, device=device)
 
     dihedral_list = [zero_tensor, zero_tensor]
     dihedral_list.extend(compute_dihedral_list(atomic_coords))
@@ -307,16 +313,12 @@ def write_to_pdb(structure, prot_id):
     out.save("output/protein_" + str(prot_id) + ".pdb")
 
 
-def calc_pairwise_distances(chain_a, chain_b, use_gpu):
-    distance_matrix = torch.Tensor(chain_a.size()[0], chain_b.size()[0]).type(
-        torch.float
-    )
+def calc_pairwise_distances(chain_a, chain_b, device):
+    distance_matrix = torch.Tensor(
+        chain_a.size()[0], chain_b.size()[0], device=device
+    ).type(torch.float)
     # add small epsilon to avoid boundary issues
-    epsilon = 10 ** (-4) * torch.ones(chain_a.size(0), chain_b.size(0))
-    if use_gpu:
-        distance_matrix = distance_matrix.cuda()
-        epsilon = epsilon.cuda()
-
+    epsilon = 10 ** (-4) * torch.ones(chain_a.size(0), chain_b.size(0), device=device)
     for i, row in enumerate(chain_a.split(1)):
         distance_matrix[i] = torch.sum((row.expand_as(chain_b) - chain_b) ** 2, 1).view(
             1, -1
@@ -325,10 +327,10 @@ def calc_pairwise_distances(chain_a, chain_b, use_gpu):
     return torch.sqrt(distance_matrix + epsilon)
 
 
-def calc_drmsd(chain_a, chain_b, use_gpu=False):
+def calc_drmsd(chain_a, chain_b, device=torch.device("cpu")):
     assert len(chain_a) == len(chain_b)
-    distance_matrix_a = calc_pairwise_distances(chain_a, chain_a, use_gpu)
-    distance_matrix_b = calc_pairwise_distances(chain_b, chain_b, use_gpu)
+    distance_matrix_a = calc_pairwise_distances(chain_a, chain_a, device)
+    distance_matrix_b = calc_pairwise_distances(chain_b, chain_b, device)
     return torch.norm(distance_matrix_a - distance_matrix_b, 2) / math.sqrt(
         (len(chain_a) * (len(chain_a) - 1))
     )
@@ -412,12 +414,12 @@ def structure_to_backbone_atoms(structure):
 
 
 def get_backbone_positions_from_angular_prediction(
-    angular_emissions, batch_sizes, use_gpu
+    angular_emissions, batch_sizes, device
 ):
     # angular_emissions -1 x minibatch size x 3 (omega, phi, psi)
-    points = pnerf.dihedral_to_point(angular_emissions, use_gpu)
+    points = pnerf.dihedral_to_point(angular_emissions, device)
     coordinates = (
-        pnerf.point_to_coordinate(points, use_gpu) / 100
+        pnerf.point_to_coordinate(points, device) / 100
     )  # devide by 100 to angstrom unit
     return (
         coordinates.transpose(0, 1)
@@ -469,7 +471,7 @@ def intial_pos_from_aa_string(batch_aa_string):
     return structures
 
 
-def pass_messages(aa_features, message_transformation, use_gpu):
+def pass_messages(aa_features, message_transformation, device):
     # aa_features (#aa, #features) - each row represents the amino acid type
     # (embedding) and the positions of the backbone atoms
     # message_transformation: (-1 * 2 * feature_size) ->
@@ -482,10 +484,9 @@ def pass_messages(aa_features, message_transformation, use_gpu):
         .expand(2, feature_size, -1)
         .transpose(1, 2)
         .transpose(0, 1)
+        .device(device)
     )
-    eye_inverted = torch.ones(eye.size(), dtype=torch.uint8) - eye
-    if use_gpu:
-        eye_inverted = eye_inverted.cuda()
+    eye_inverted = torch.ones(eye.size(), dtype=torch.uint8, device=device) - eye
     features_repeated = aa_features.repeat((aa_count, 1)).view(
         (aa_count, aa_count, feature_size)
     )
