@@ -75,7 +75,7 @@ parser.add_argument(
     "--minibatch-size",
     dest="minibatch_size",
     type=int,
-    default=1,
+    default=128,
     help="Size of each minibatch.",
 )
 parser.add_argument(
@@ -113,11 +113,11 @@ def train_model(
 ):
     set_experiment_id(data_set_identifier, learning_rate, minibatch_size)
 
-    train_loader = contruct_dataloader_from_disk(train_file, minibatch_size)
-    validation_loader = contruct_dataloader_from_disk(val_file, minibatch_size)
+    train_loader = contruct_dataloader_from_disk(train_file, minibatch_size, device)
+    validation_loader = contruct_dataloader_from_disk(val_file, minibatch_size, device)
     validation_dataset_size = validation_loader.dataset.__len__()
 
-    model = LSTMModel(21, minibatch_size, device)
+    model = LSTMModel(device)
 
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
     criterion = torch.nn.MSELoss()

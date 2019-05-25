@@ -4,12 +4,11 @@
 #
 # For license information, please see the LICENSE file in the root directory.
 
-import torch
 import torch.nn as nn
 from torch.nn.utils.rnn import pack_padded_sequence
 
 # seed random generator for reproducibility
-torch.manual_seed(42)
+# torch.manual_seed(42)
 
 # sample model borrowed from
 # https://github.com/lblaabjerg/Master/blob/master/Models%20and%20processed%20data/ProteinNet_LSTM_500.py
@@ -21,9 +20,10 @@ class ResnetModel(nn.Module):
 
 
 class LSTMModel(nn.Module):
-    def __init__(self, input_dims=20, num_lstms=2, lstm_dims=512, out_dims=3):
+    def __init__(self, device, input_dims=20, num_lstms=2, lstm_dims=512, out_dims=3):
         super(LSTMModel, self).__init__()
-        self.brnn = torch.nn.LSTM(
+        self.device = device
+        self.brnn = nn.LSTM(
             input_size=input_dims,
             hidden_size=lstm_dims,
             num_layers=2,
@@ -31,9 +31,9 @@ class LSTMModel(nn.Module):
             batch_first=True,
             bidirectional=True,
         )
-        self.fc1 = torch.nn.Linear(in_features=2 * lstm_dims, out_features=512)
-        self.fc2 = torch.nn.Linear(in_features=512, out_features=256)
-        self.fc3 = torch.nn.Linear(in_features=256, out_features=out_dims)
+        self.fc1 = nn.Linear(in_features=2 * lstm_dims, out_features=512)
+        self.fc2 = nn.Linear(in_features=512, out_features=256)
+        self.fc3 = nn.Linear(in_features=256, out_features=out_dims)
 
     def generate_input(self, primary, evolutionary, lengths, embedding="one_hot"):
         """
