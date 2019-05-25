@@ -4,6 +4,7 @@
 #
 # For license information, please see the LICENSE file in the root directory.
 
+import torch
 import torch.nn as nn
 from torch.nn.utils.rnn import pack_padded_sequence
 
@@ -39,8 +40,17 @@ class LSTMModel(nn.Module):
         """
         primary is of shape [minibatch_size, MAX_SEQ_LEN]
         """
-        if embedding == "one_hot":
-            pass
+        # FIXME So for now we have primary classes going from 0-19 but then
+        # the padded sequence has 0s at the end as well
+        # Packing these padded sequences should be fine but should be careful
+        # Need to find a better way
+        features = []
+        for i, prot in enumerate(primary):
+            if embedding == "one_hot":
+                onehot = torch.FloatTensor(2000, 20, device=self.device).zero_()
+                onehot = onehot.scatter_(1, prot.view(-1, 1).type(torch.long), 1)
+                features.append(onehot)
+        return torch.tensor(pack_padded_sequence(features, lengths), device=self.device)
 
     def forward(self, padded_input, input_lengths):
         # padded_input is of size [Max_len, Batch_size, fv]
