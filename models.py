@@ -13,12 +13,7 @@ from torch.nn.utils.rnn import pack_padded_sequence
 
 # sample model borrowed from
 # https://github.com/lblaabjerg/Master/blob/master/Models%20and%20processed%20data/ProteinNet_LSTM_500.py
-
-
-class ResnetModel(nn.Module):
-    def __init__(self,):
-        super(ResnetModel, self).__init__()
-
+       
 
 class LSTMModel(nn.Module):
     def __init__(self, device, input_dims=20, num_lstms=2, lstm_dims=512, out_dims=3):
