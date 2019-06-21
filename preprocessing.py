@@ -8,19 +8,21 @@ import glob
 import os
 import os.path
 
+import multiprocessing 
+
 import h5py
 import numpy as np
 
 from util import (
+    encode_primary_string,
     DSSP_DICT,
     MASK_DICT,
+    masked_select,
     calculate_phi_from_masked_tertiary,
     calculate_psi_from_masked_tertiary,
-    encode_primary_string,
-    masked_select,
 )
 
-MAX_SEQUENCE_LENGTH = 2000
+MAX_SEQUENCE_LENGTH = 1000
 
 
 def read_protein_from_file(file_pointer):
@@ -104,8 +106,8 @@ def read_protein_from_file(file_pointer):
             return None
 
 
-def process_file(input_file, output_file):
-    print("Processing raw data file", input_file)
+def process_file(id, input_file, output_file):
+    print("[", id, "]", "Processing raw data file", input_file)
     # Means resize every 50 proteins
     mini_batch_size = 50
     idx = 0
@@ -176,7 +178,7 @@ def process_file(input_file, output_file):
         sequence_length = len(protein["primary"])
 
         if sequence_length > MAX_SEQUENCE_LENGTH:
-            print(
+            print("[", id, "]",
                 "Protein "
                 + protein["id"]
                 + " is too large and will not be considered. Length = "
@@ -210,7 +212,7 @@ def process_file(input_file, output_file):
         if skip_flg:
             continue
 
-        # print(protein["id"])
+        #print("[", id, "]", protein["id"])
         masked_length = len(primary_masked)
 
         primary_padded = np.zeros(MAX_SEQUENCE_LENGTH)
@@ -249,7 +251,7 @@ def process_file(input_file, output_file):
             dset5.resize((resize_shape, MAX_SEQUENCE_LENGTH))
 
     input_file_pointer.close()
-    print("Wrote output of ", idx, " proteins to ", output_file)
+    print("[", id, "]", "Wrote output of ", idx, " proteins to ", output_file)
 
 
 def filter_input_files(input_files):
@@ -263,6 +265,9 @@ def filter_input_files(input_files):
 
 def process_raw_data(force_pre_processing_overwrite=False):
     print("Starting pre-processing of raw data...")
+
+    process_count = 0
+    processes = []
 
     input_files = glob.glob("data/raw/*")
     input_files_filtered = filter_input_files(input_files)
@@ -282,6 +287,13 @@ def process_raw_data(force_pre_processing_overwrite=False):
                 print("Skipping pre-processing for this file...")
 
         if not os.path.isfile(preprocessed_file_name):
-            process_file(filename, preprocessed_file_name)
+            process_count += 1
+            process = multiprocessing.Process(target=process_file, args=(process_count, filename, preprocessed_file_name))
+            processes.append(process)
+            process.start()
+            #process_file(filename, preprocessed_file_name)
+
+    for p in processes:
+        p.join()
 
     print("Completed pre-processing.")
