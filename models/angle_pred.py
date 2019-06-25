@@ -1,8 +1,7 @@
 import torch
 import torch.nn as nn
-import random
 
-######################################## GENERATE INPUT ##########################################
+# ###################################### GENERATE INPUT ##########################################
 
 NETWORK_INPUT_RESIDUES_MAX = 1000
 
@@ -13,10 +12,12 @@ NETWORK_INPUT_RESIDUES_MAX = 1000
 
 # Residue ID: [0, 20)
 
+
 def get_one_hot_residue_encoding(residue):
-    assert(residue >= 0 and residue < 20)
+    assert residue >= 0 and residue < 20
     output = torch.zeros(20)
     output[residue] = 1
+
 
 def generate_input_tensor(pssm, residue_list):
     residue_oh_tensor = torch.zeros(len(residue_list), 20)
@@ -25,24 +26,31 @@ def generate_input_tensor(pssm, residue_list):
         residue_oh_tensor[i][residue] = 1
     return torch.cat((pssm, residue_oh_tensor))
 
+
 def get_residue_index(residue):
     return residue
 
-########################################### NETWORK #############################################
+
+# ######################################### NETWORK #############################################
+
 
 class ResidualBlock(nn.Module):
     def __init__(self, in_channels, out_channels, ksize1, ksize2):
         super(ResidualBlock, self).__init__()
         self.bn1 = nn.BatchNorm1d(num_features=in_channels)
-        self.conv1 = nn.Conv1d(in_channels=in_channels,
-                               out_channels=out_channels,
-                               kernel_size=ksize1,
-                               padding=ksize1//2)
+        self.conv1 = nn.Conv1d(
+            in_channels=in_channels,
+            out_channels=out_channels,
+            kernel_size=ksize1,
+            padding=ksize1 // 2,
+        )
         self.bn2 = nn.BatchNorm1d(num_features=out_channels)
-        self.conv2 = nn.Conv1d(in_channels=out_channels,
-                               out_channels=out_channels,
-                               kernel_size=ksize2,
-                               padding=ksize2//2)
+        self.conv2 = nn.Conv1d(
+            in_channels=out_channels,
+            out_channels=out_channels,
+            kernel_size=ksize2,
+            padding=ksize2 // 2,
+        )
 
     def forward(self, input):
         residual = self.bn1(input)
@@ -56,19 +64,26 @@ class ResidualBlock(nn.Module):
         output = input + residual
         return output
 
+
 class Network(nn.Module):
     def __init__(self, device):
         super(Network, self).__init__()
         self.blocks = []
-        
-        self.blocks.append(ResidualBlock(in_channels=40,
-                                         out_channels=40,
-                                         ksize1=3, ksize2=3).to(device))
+
+        self.blocks.append(
+            ResidualBlock(in_channels=40, out_channels=40, ksize1=3, ksize2=3).to(
+                device
+            )
+        )
         for _ in range(64):
             self.blocks.append(ResidualBlock(40, 40, 3, 3).to(device))
 
-        self.fc1 = nn.Linear(40 * NETWORK_INPUT_RESIDUES_MAX, 16 * NETWORK_INPUT_RESIDUES_MAX)
-        self.fc2 = nn.Linear(16 * NETWORK_INPUT_RESIDUES_MAX,  4 * NETWORK_INPUT_RESIDUES_MAX)
+        self.fc1 = nn.Linear(
+            40 * NETWORK_INPUT_RESIDUES_MAX, 16 * NETWORK_INPUT_RESIDUES_MAX
+        )
+        self.fc2 = nn.Linear(
+            16 * NETWORK_INPUT_RESIDUES_MAX, 4 * NETWORK_INPUT_RESIDUES_MAX
+        )
 
     def generate_input(self, pssm, primary, lengths):
         # pssm [n, 21, sequence_size]
@@ -77,7 +92,7 @@ class Network(nn.Module):
         transformed_primary = torch.zeros(batch_size, 20, NETWORK_INPUT_RESIDUES_MAX)
 
         for i in range(batch_size):
-            assert(lengths[i] <= NETWORK_INPUT_RESIDUES_MAX)
+            assert lengths[i] <= NETWORK_INPUT_RESIDUES_MAX
             for j in range(lengths[i]):
                 residue = int(primary[i][j])
                 transformed_primary[i][residue][j] = 1.0
@@ -105,4 +120,3 @@ class Network(nn.Module):
         output = torch.tanh(output)
 
         return output
-

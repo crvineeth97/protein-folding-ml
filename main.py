@@ -3,6 +3,7 @@
 #
 # @author Jeppe Hallgren
 # @author Vineeth Chelur
+# @author Yashas Samaga
 #
 # For license information, please see the LICENSE file in the root directory.
 
@@ -17,7 +18,10 @@ import torch.optim as optim
 import torch.utils.data
 
 from dashboard import start_dashboard_server
+from models.angle_pred import NETWORK_INPUT_RESIDUES_MAX
+from models.angle_pred import Network as ResNetModel
 from models.lstm import LSTMModel
+from parameters import EVAL_INTERVAL, LEARNING_RATE, MIN_UPDATES, MINIBATCH_SIZE
 from preprocessing import process_raw_data
 from util import (
     calculate_dihedral_angels,
@@ -31,21 +35,8 @@ from util import (
     write_to_pdb,
 )
 
-from models.angle_pred import Network as ResNetModel
-from models.angle_pred import NETWORK_INPUT_RESIDUES_MAX
-
-print("------------------------------------------------------------------")
-print("---------------------------- OpenProtein -------------------------")
-print("------------------------------------------------------------------")
-
 # TODO Add more arguments
 parser = argparse.ArgumentParser(description="OpenProtein version 0.1")
-parser.add_argument(
-    "--silent",
-    dest="silent",
-    action="store_true",
-    help="Dont print verbose debug statements.",
-)
 parser.add_argument(
     "--hide-ui",
     dest="hide_ui",
@@ -59,34 +50,6 @@ parser.add_argument(
     action="store_true",
     default=False,
     help="Run model on test data.",
-)
-parser.add_argument(
-    "--eval-interval",
-    dest="eval_interval",
-    type=int,
-    default=5,
-    help="Evaluate model on validation set every n minibatches.",
-)
-parser.add_argument(
-    "--min-updates",
-    dest="minimum_updates",
-    type=int,
-    default=5000,
-    help="Minimum number of minibatch iterations.",
-)
-parser.add_argument(
-    "--minibatch-size",
-    dest="minibatch_size",
-    type=int,
-    default=128,
-    help="Size of each minibatch.",
-)
-parser.add_argument(
-    "--learning-rate",
-    dest="learning_rate",
-    type=float,
-    default=0.01,
-    help="Learning rate to use during training.",
 )
 parser.add_argument(
     "--log-file",
@@ -111,18 +74,16 @@ parser.add_argument(
 )
 
 
-def train_model(
-    data_set_identifier, train_file, val_file, learning_rate, minibatch_size
-):
-    set_experiment_id(data_set_identifier, learning_rate, minibatch_size)
+def train_model(data_set_identifier, train_file, val_file):
+    set_experiment_id(data_set_identifier, LEARNING_RATE, MINIBATCH_SIZE)
 
-    train_loader = contruct_dataloader_from_disk(train_file, minibatch_size, device)
-    validation_loader = contruct_dataloader_from_disk(val_file, minibatch_size, device)
+    train_loader = contruct_dataloader_from_disk(train_file, MINIBATCH_SIZE, device)
+    validation_loader = contruct_dataloader_from_disk(val_file, MINIBATCH_SIZE, device)
     validation_dataset_size = validation_loader.dataset.__len__()
 
     model = LSTMModel(device)
 
-    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+    optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
     criterion = torch.nn.MSELoss()
 
     sample_num = list()
@@ -143,10 +104,10 @@ def train_model(
             minibatches_proccesed += 1
             lengths, primary, evolutionary, phi, psi = training_minibatch
             print(primary)
-            
+
             start_compute_loss = time.time()
             # inp should be the feature vectors to send to the particular model
-            # primary is of shape [minibatch_size, MAX_SEQ_LEN]
+            # primary is of shape [MINIBATCH_SIZE, MAX_SEQ_LEN]
             inp = model.generate_input(primary, evolutionary, lengths)
             # output of the model
             # In our case: sin(phi), cos(phi), sin(psi), cos(psi)
@@ -170,9 +131,9 @@ def train_model(
             )
             optimizer.step()
 
-            # for every eval_interval samples,
+            # for every EVAL_INTERVAL samples,
             # plot performance on the validation set
-            if minibatches_proccesed % ARGS.eval_interval == 0:
+            if minibatches_proccesed % EVAL_INTERVAL == 0:
 
                 write_out("Testing model on validation set...")
 
@@ -238,7 +199,7 @@ def train_model(
                         print(res.json())
 
                 if (
-                    minibatches_proccesed > ARGS.minimum_updates
+                    minibatches_proccesed > MIN_UPDATES
                     and minibatches_proccesed > best_model_minibatch_time * 2
                 ):
                     stopping_condition_met = True
@@ -246,17 +207,18 @@ def train_model(
     write_result_summary(best_model_loss)
     return best_model_path
 
-def train_model_resnet(data_set_identifier, train_file, val_file, learning_rate, minibatch_size):
-    set_experiment_id(data_set_identifier, learning_rate, minibatch_size)
 
-    train_loader = contruct_dataloader_from_disk(train_file, minibatch_size, None)
-    validation_loader = contruct_dataloader_from_disk(val_file, minibatch_size, None)
+def train_model_resnet(data_set_identifier, train_file, val_file):
+    set_experiment_id(data_set_identifier, LEARNING_RATE, MINIBATCH_SIZE)
+
+    train_loader = contruct_dataloader_from_disk(train_file, MINIBATCH_SIZE, None)
+    validation_loader = contruct_dataloader_from_disk(val_file, MINIBATCH_SIZE, None)
     validation_dataset_size = len(validation_loader.dataset)
 
-    torch.set_default_tensor_type('torch.cuda.FloatTensor')
+    torch.set_default_tensor_type("torch.cuda.FloatTensor")
     model = ResNetModel(device).to(device)
 
-    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+    optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
     criterion = torch.nn.MSELoss()
 
     sample_num = list()
@@ -276,7 +238,7 @@ def train_model_resnet(data_set_identifier, train_file, val_file, learning_rate,
         for minibatch_id, training_minibatch in enumerate(train_loader, 0):
             minibatches_proccesed += 1
             lengths, primary, evolutionary, phi, psi = training_minibatch
-                
+
             batch_size = len(primary)
             transformed_phi = torch.zeros(batch_size, 1, NETWORK_INPUT_RESIDUES_MAX)
             transformed_psi = torch.zeros(batch_size, 1, NETWORK_INPUT_RESIDUES_MAX)
@@ -288,7 +250,7 @@ def train_model_resnet(data_set_identifier, train_file, val_file, learning_rate,
             start_compute_loss = time.time()
 
             # expected input shape: [n, 40, L]
-            inp = model.generate_input(evolutionary, primary, lengths)#.cuda()
+            inp = model.generate_input(evolutionary, primary, lengths)  # .cuda()
 
             # expected output shape: [n, 4, L]
             # sin(phi), cos(phi), sin(psi), cos(psi)
@@ -297,7 +259,10 @@ def train_model_resnet(data_set_identifier, train_file, val_file, learning_rate,
             cos_phi_tensor = torch.cos(transformed_phi)
             sin_psi_tensor = torch.sin(transformed_psi)
             cos_psi_tensor = torch.cos(transformed_psi)
-            target = torch.stack((sin_phi_tensor, cos_phi_tensor, sin_psi_tensor, cos_psi_tensor), device=device)
+            target = torch.stack(
+                (sin_phi_tensor, cos_phi_tensor, sin_psi_tensor, cos_psi_tensor),
+                device=device,
+            )
             target = target.permute(2, 1, 0, 3)
             target = target.reshape(1, batch_size, -1)
             target = target.squeeze()
@@ -316,9 +281,9 @@ def train_model_resnet(data_set_identifier, train_file, val_file, learning_rate,
             )
             optimizer.step()
 
-            # for every eval_interval samples,
+            # for every EVAL_INTERVAL samples,
             # plot performance on the validation set
-            if minibatches_proccesed % ARGS.eval_interval == 0:
+            if minibatches_proccesed % EVAL_INTERVAL == 0:
 
                 write_out("Testing model on validation set...")
 
@@ -392,6 +357,7 @@ def train_model_resnet(data_set_identifier, train_file, val_file, learning_rate,
     write_result_summary(best_model_loss)
     return best_model_path
 
+
 ARGS = parser.parse_known_args()[0]
 device = torch.device("cpu")
 
@@ -408,7 +374,7 @@ if not ARGS.hide_ui:
     start_dashboard_server()
 
 start = time.time()
-#process_raw_data(force_pre_processing_overwrite=False)
+process_raw_data(force_pre_processing_overwrite=False)
 end = time.time()
 
 print("Total Preprocessing Time: ", end - start)
@@ -417,8 +383,6 @@ training_file = "data/preprocessed/training_30.hdf5"
 validation_file = "data/preprocessed/validation.hdf5"
 testing_file = "data/preprocessed/testing.hdf5"
 
-train_model_path = train_model_resnet(
-    "TRAIN", training_file, validation_file, ARGS.learning_rate, ARGS.minibatch_size
-)
+train_model_path = train_model_resnet("TRAIN", training_file, validation_file)
 
-#print(train_model_path)
+# print(train_model_path)

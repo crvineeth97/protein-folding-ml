@@ -1,9 +1,3 @@
-# This file is part of the OpenProtein project.
-#
-# @author Jeppe Hallgren
-#
-# For license information, please see the LICENSE file in the root directory.
-
 import torch
 import torch.nn as nn
 from torch.nn.utils.rnn import pack_padded_sequence
@@ -11,9 +5,6 @@ from torch.nn.utils.rnn import pack_padded_sequence
 # seed random generator for reproducibility
 # torch.manual_seed(42)
 
-# sample model borrowed from
-# https://github.com/lblaabjerg/Master/blob/master/Models%20and%20processed%20data/ProteinNet_LSTM_500.py
-       
 
 class LSTMModel(nn.Module):
     def __init__(self, device, input_dims=20, num_lstms=2, lstm_dims=512, out_dims=3):
