@@ -9,3 +9,6 @@ MIN_UPDATES = 5000
 
 # Evaluate model on validation set every n minibatches
 EVAL_INTERVAL = 5
+
+# Maximum length of protein to be preprocessed
+MAX_PROTEIN_LENGTH = 1000

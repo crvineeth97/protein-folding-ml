@@ -5,6 +5,7 @@ from os.path import isfile
 import numpy as np
 from h5py import File
 
+from parameters import MAX_PROTEIN_LENGTH
 from util import (
     DSSP_DICT,
     MASK_DICT,
@@ -13,8 +14,6 @@ from util import (
     encode_primary_string,
     masked_select,
 )
-
-MAX_SEQUENCE_LENGTH = 1000
 
 
 def read_protein_from_file(file_pointer):
@@ -129,48 +128,48 @@ def process_file(input_file, output_file):
     )
     dset1 = f.create_dataset(
         "primary",
-        (mini_batch_size, MAX_SEQUENCE_LENGTH),
-        maxshape=(None, MAX_SEQUENCE_LENGTH),
+        (mini_batch_size, MAX_PROTEIN_LENGTH),
+        maxshape=(None, MAX_PROTEIN_LENGTH),
         dtype="uint8",
     )
     dset2 = f.create_dataset(
         "evolutionary",
-        (mini_batch_size, MAX_SEQUENCE_LENGTH, 21),
-        maxshape=(None, MAX_SEQUENCE_LENGTH, 21),
+        (mini_batch_size, MAX_PROTEIN_LENGTH, 21),
+        maxshape=(None, MAX_PROTEIN_LENGTH, 21),
         dtype="float",
     )
     # No secondary information available in ProteinNet
     # Skipping this for now
     # dset3 = f.create_dataset(
     #     "secondary",
-    #     (mini_batch_size, MAX_SEQUENCE_LENGTH),
-    #     maxshape=(None, MAX_SEQUENCE_LENGTH),
+    #     (mini_batch_size, MAX_PROTEIN_LENGTH),
+    #     maxshape=(None, MAX_PROTEIN_LENGTH),
     #     dtype="uint8",
     # )
     # dset4 = f.create_dataset(
     #     "tertiary",
-    #     (mini_batch_size, MAX_SEQUENCE_LENGTH, 9),
-    #     maxshape=(None, MAX_SEQUENCE_LENGTH, 9),
+    #     (mini_batch_size, MAX_PROTEIN_LENGTH, 9),
+    #     maxshape=(None, MAX_PROTEIN_LENGTH, 9),
     #     dtype="float",
     # )
     # Instead of storing tertiary data, let us store the phi, psi angles
     dset4 = f.create_dataset(
         "phi",
-        (mini_batch_size, MAX_SEQUENCE_LENGTH),
-        maxshape=(None, MAX_SEQUENCE_LENGTH),
+        (mini_batch_size, MAX_PROTEIN_LENGTH),
+        maxshape=(None, MAX_PROTEIN_LENGTH),
         dtype="float",
     )
     dset5 = f.create_dataset(
         "psi",
-        (mini_batch_size, MAX_SEQUENCE_LENGTH),
-        maxshape=(None, MAX_SEQUENCE_LENGTH),
+        (mini_batch_size, MAX_PROTEIN_LENGTH),
+        maxshape=(None, MAX_PROTEIN_LENGTH),
         dtype="float",
     )
     # No need to store the masks
     # dset5 = f.create_dataset(
     #     "mask",
-    #     (mini_batch_size, MAX_SEQUENCE_LENGTH),
-    #     maxshape=(None, MAX_SEQUENCE_LENGTH),
+    #     (mini_batch_size, MAX_PROTEIN_LENGTH),
+    #     maxshape=(None, MAX_PROTEIN_LENGTH),
     #     dtype="uint8",
     # )
 
@@ -186,7 +185,7 @@ def process_file(input_file, output_file):
 
         sequence_length = len(protein["primary"])
 
-        if sequence_length > MAX_SEQUENCE_LENGTH:
+        if sequence_length > MAX_PROTEIN_LENGTH:
             print(
                 "Protein "
                 + protein["id"]
@@ -224,11 +223,11 @@ def process_file(input_file, output_file):
         # print(protein["id"])
         masked_length = len(primary_masked)
 
-        primary_padded = np.zeros(MAX_SEQUENCE_LENGTH)
-        evolutionary_padded = np.zeros((MAX_SEQUENCE_LENGTH, 21))
-        # secondary_padded = np.zeros(MAX_SEQUENCE_LENGTH)
-        phi_padded = np.zeros(MAX_SEQUENCE_LENGTH)
-        psi_padded = np.zeros(MAX_SEQUENCE_LENGTH)
+        primary_padded = np.zeros(MAX_PROTEIN_LENGTH)
+        evolutionary_padded = np.zeros((MAX_PROTEIN_LENGTH, 21))
+        # secondary_padded = np.zeros(MAX_PROTEIN_LENGTH)
+        phi_padded = np.zeros(MAX_PROTEIN_LENGTH)
+        psi_padded = np.zeros(MAX_PROTEIN_LENGTH)
 
         primary_padded[:masked_length] = primary_masked
         evolutionary_padded[:masked_length] = evolutionary_masked
@@ -253,11 +252,11 @@ def process_file(input_file, output_file):
         if idx % mini_batch_size == 0:
             resize_shape = (idx / mini_batch_size + 1) * mini_batch_size
             dsetl.resize((resize_shape, 1))
-            dset1.resize((resize_shape, MAX_SEQUENCE_LENGTH))
-            dset2.resize((resize_shape, MAX_SEQUENCE_LENGTH, 21))
-            # dset3.resize((resize_shape, MAX_SEQUENCE_LENGTH))
-            dset4.resize((resize_shape, MAX_SEQUENCE_LENGTH))
-            dset5.resize((resize_shape, MAX_SEQUENCE_LENGTH))
+            dset1.resize((resize_shape, MAX_PROTEIN_LENGTH))
+            dset2.resize((resize_shape, MAX_PROTEIN_LENGTH, 21))
+            # dset3.resize((resize_shape, MAX_PROTEIN_LENGTH))
+            dset4.resize((resize_shape, MAX_PROTEIN_LENGTH))
+            dset5.resize((resize_shape, MAX_PROTEIN_LENGTH))
 
     input_file_pointer.close()
     print("Wrote output of ", idx, " proteins to ", output_file)

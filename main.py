@@ -18,10 +18,15 @@ import torch.optim as optim
 import torch.utils.data
 
 from dashboard import start_dashboard_server
-from models.angle_pred import NETWORK_INPUT_RESIDUES_MAX
-from models.angle_pred import Network as ResNetModel
 from models.lstm import LSTMModel
-from parameters import EVAL_INTERVAL, LEARNING_RATE, MIN_UPDATES, MINIBATCH_SIZE
+from models.resnet import ResNet
+from parameters import (
+    EVAL_INTERVAL,
+    LEARNING_RATE,
+    MIN_UPDATES,
+    MINIBATCH_SIZE,
+    MAX_PROTEIN_LENGTH,
+)
 from preprocessing import process_raw_data
 from util import (
     calculate_dihedral_angels,
@@ -216,8 +221,7 @@ def train_model_resnet(data_set_identifier, train_file, val_file):
     validation_loader = contruct_dataloader_from_disk(val_file, MINIBATCH_SIZE, None)
     validation_dataset_size = len(validation_loader.dataset)
 
-    torch.set_default_tensor_type("torch.cuda.FloatTensor")
-    model = ResNetModel(device).to(device)
+    model = ResNet().to(device)
 
     optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
     criterion = torch.nn.MSELoss()
@@ -241,8 +245,8 @@ def train_model_resnet(data_set_identifier, train_file, val_file):
             lengths, primary, evolutionary, phi, psi = training_minibatch
 
             batch_size = len(primary)
-            transformed_phi = torch.zeros(batch_size, 1, NETWORK_INPUT_RESIDUES_MAX)
-            transformed_psi = torch.zeros(batch_size, 1, NETWORK_INPUT_RESIDUES_MAX)
+            transformed_phi = torch.zeros(batch_size, 1, MAX_PROTEIN_LENGTH)
+            transformed_psi = torch.zeros(batch_size, 1, MAX_PROTEIN_LENGTH)
 
             for i in range(batch_size):
                 transformed_phi[i] = phi[i]
