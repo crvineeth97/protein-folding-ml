@@ -33,7 +33,9 @@ class LSTMModel(nn.Module):
         features = []
         for i, prot in enumerate(primary):
             if embedding == "one_hot":
-                onehot = torch.FloatTensor(2000, 20, device=self.device).zero_()
+                onehot = torch.zeros(
+                    [2000, 20], dtype=torch.float64, device=self.device
+                )
                 onehot = onehot.scatter_(1, prot.view(-1, 1).type(torch.long), 1)
                 features.append(onehot)
         return torch.tensor(pack_padded_sequence(features, lengths), device=self.device)

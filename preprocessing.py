@@ -1,15 +1,9 @@
-# This file is part of the OpenProtein project.
-#
-# @author Jeppe Hallgren
-#
-# For license information, please see the LICENSE file in the root directory.
+from glob import glob
+from os import remove
+from os.path import isfile
 
-import glob
-import os
-import os.path
-
-import h5py
 import numpy as np
+from h5py import File
 
 from util import (
     DSSP_DICT,
@@ -24,7 +18,6 @@ MAX_SEQUENCE_LENGTH = 1000
 
 
 def read_protein_from_file(file_pointer):
-
     dict_ = {}
 
     is_protein_info_correct = True
@@ -33,21 +26,24 @@ def read_protein_from_file(file_pointer):
         if not is_protein_info_correct:
             return {}
         next_line = file_pointer.readline()
+
+        # ID of the protein
         if next_line == "[ID]\n":
-            # ID of the protein
             id_ = file_pointer.readline()[:-1]
             dict_.update({"id": id_})
+
+        # Amino acid sequence of the protein
         elif next_line == "[PRIMARY]\n":
-            # Amino acid sequence of the protein
             primary = encode_primary_string(file_pointer.readline()[:-1])
             seq_len = len(primary)
             dict_.update({"primary": primary})
+
+        # PSSM matrix + Information Content
+        # Dimensions: [21, Protein Length]
+        # First 20 rows represents the PSSM info of
+        # each amino acid in alphabetical order
+        # 21st row represents information content
         elif next_line == "[EVOLUTIONARY]\n":
-            # PSSM matrix + Information Content
-            # Dimensions: [21, Protein Length]
-            # First 20 rows represents the PSSM info of
-            # each amino acid in alphabetical order
-            # 21st row represents information content
             evolutionary = []
             for residue in range(21):
                 evolutionary.append(
@@ -62,19 +58,24 @@ def read_protein_from_file(file_pointer):
                     is_protein_info_correct = False
                     break
             dict_.update({"evolutionary": evolutionary})
+
+        # Secondary structure information of the protein
+        # 8 classes: L, H, B, E, G, I, T, S
         elif next_line == "[SECONDARY]\n":
             secondary = list([DSSP_DICT[dssp] for dssp in file_pointer.readline()[:-1]])
             dict_.update({"secondary": secondary})
+
+        # Tertiary structure information of the protein
+        # The values are represented in picometers
+        # => Relative to PDB, multiply by 100
+        # Dimensions: [3, 3 * Protein Length]
+        # Eg: for protein of length 1
+        #      N       C_a       C
+        # X  2841.8,  2873.4,  2919.7
+        # Y  -864.7,  -957.9,  -877.0
+        # Z -6727.1, -6616.3, -6496.2
         elif next_line == "[TERTIARY]\n":
             tertiary = []
-            # The values are represented in picometers
-            # => Relative to PDB, multiply by 100
-            # Dimensions: [3, 3 * Protein Length]
-            # Eg: for protein of length 1
-            #      N       C_a       C
-            # X  2841.8,  2873.4,  2919.7
-            # Y  -864.7,  -957.9,  -877.0
-            # Z -6727.1, -6616.3, -6496.2
             for axis in range(3):
                 tertiary.append(
                     [float(coord) for coord in file_pointer.readline().split()]
@@ -88,6 +89,10 @@ def read_protein_from_file(file_pointer):
                     is_protein_info_correct = False
                     break
             dict_.update({"tertiary": tertiary})
+
+        # Some residues might be missing from a protein
+        # Mask contains a '+' or a '-' based on whether
+        # the residue has tertiary information or not
         elif next_line == "[MASK]\n":
             mask = list([MASK_DICT[aa] for aa in file_pointer.readline()[:-1]])
             if len(mask) != seq_len:
@@ -98,8 +103,13 @@ def read_protein_from_file(file_pointer):
                 )
                 is_protein_info_correct = False
             dict_.update({"mask": mask})
+
+        # All the information of the current protein
+        # is available in dict now
         elif next_line == "\n":
             return dict_
+
+        # File has been read completely
         elif next_line == "":
             return None
 
@@ -109,8 +119,9 @@ def process_file(input_file, output_file):
     # Means resize every 50 proteins
     mini_batch_size = 50
     idx = 0
-    # Create output file
-    f = h5py.File(output_file, "w")
+    # Create h5py output file
+    f = File(output_file, "w")
+
     # The following variables are datasets of the h5py file
     # Can add more information if available
     dsetl = f.create_dataset(
@@ -264,24 +275,24 @@ def filter_input_files(input_files):
 def process_raw_data(force_pre_processing_overwrite=False):
     print("Starting pre-processing of raw data...")
 
-    input_files = glob.glob("data/raw/*")
+    input_files = glob("data/raw/*")
     input_files_filtered = filter_input_files(input_files)
     for file_path in input_files_filtered:
         filename = file_path.split("/")[-1]
         preprocessed_file_name = "data/preprocessed/" + filename + ".hdf5"
 
         # check if we should remove the any previously processed files
-        if os.path.isfile(preprocessed_file_name):
+        if isfile(preprocessed_file_name):
             print("Preprocessed file for " + filename + " already exists.")
             if force_pre_processing_overwrite:
                 print(
                     "force_pre_processing_overwrite flag set to True, overwriting old file..."
                 )
-                os.remove(preprocessed_file_name)
+                remove(preprocessed_file_name)
             else:
                 print("Skipping pre-processing for this file...")
 
-        if not os.path.isfile(preprocessed_file_name):
+        if not isfile(preprocessed_file_name):
             process_file(filename, preprocessed_file_name)
 
     print("Completed pre-processing.")

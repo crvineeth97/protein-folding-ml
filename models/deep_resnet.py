@@ -7,7 +7,7 @@ import torch.nn as nn
 
 SEQUENCE_LENGTH = 30
 
-# NETWORK 1D
+# ######################################### NETWORK 1D ######################################### #
 
 NETWORK1_INPUT_FEATURES = 26
 NETWORK1_INPUT_SIZE = (1, NETWORK1_INPUT_FEATURES, SEQUENCE_LENGTH)
@@ -73,7 +73,7 @@ class Network1d(nn.Module):
         return output
 
 
-# NETWORK 2D
+# ######################################### NETWORK 2D ######################################### #
 
 NETWORK2_INPUT_FEATURES = 432
 NETWORK2_INPUT_SIZE = (1, NETWORK1_INPUT_FEATURES, SEQUENCE_LENGTH, SEQUENCE_LENGTH)
@@ -139,7 +139,7 @@ class Network2d(nn.Module):
         return output
 
 
-# SEQUENTIAL TO PAIRWISE FEATURE CONVERSION
+# ########################## SEQUENTIAL TO PAIRWISE FEATURE CONVERSION ########################## #
 
 # input shape: [1, n, L]
 # output shape: [1, m, L, L]
@@ -159,7 +159,7 @@ def convert_seq2pair(input_tensor):
     return output_tensor
 
 
-# CO-EVOLUTION AND PAIRWISE POTENTIAL INFO
+# ########################## CO-EVOLUTION AND PAIRWISE POTENTIAL INFO ########################## #
 
 
 def concat_extra_info(input_tensor, extra_tensor):
@@ -168,7 +168,7 @@ def concat_extra_info(input_tensor, extra_tensor):
     return torch.cat((input_tensor, extra_tensor), dim=1)
 
 
-# GENERATE INPUT
+# ####################################### GENERATE INPUT ####################################### #
 
 
 def generate_input_tensor(pssm, ss3_pred, sa_pred):
@@ -183,7 +183,7 @@ def generate_input_tensor(pssm, ss3_pred, sa_pred):
     return torch.cat((pssm, ss3_pred, sa_pred))
 
 
-# MAIN
+# ############################################ MAIN ############################################ #
 
 
 def main():

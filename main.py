@@ -139,6 +139,7 @@ def train_model(data_set_identifier, train_file, val_file):
 
                 train_loss = loss_tracker.mean()
                 loss_tracker = np.zeros(0)
+                # Check out this function for validation
                 validation_loss, data_total, rmsd_avg, drmsd_avg = evaluate_model(
                     validation_loader, model
                 )
