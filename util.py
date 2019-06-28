@@ -3,13 +3,13 @@ import time
 from datetime import datetime
 import warnings
 
-import h5py
 import numpy as np
 import torch
 import torch.utils.data
 from Bio.PDB import PDBIO
+from os import listdir
 from PeptideBuilder import make_structure
-
+from parameters import MINIBATCH_SIZE, LEARNING_RATE
 import pnerf.pnerf as pnerf
 
 warnings.filterwarnings("error")
@@ -40,64 +40,50 @@ DSSP_DICT = {"L": 0, "H": 1, "B": 2, "E": 3, "G": 4, "I": 5, "T": 6, "S": 7}
 MASK_DICT = {"-": 0, "+": 1}
 
 
-def contruct_dataloader_from_disk(filename, minibatch_size, device):
+def contruct_dataloader_from_disk(foldername, device):
     return torch.utils.data.DataLoader(
-        H5PytorchDataset(filename, device),
-        batch_size=minibatch_size,
+        ProteinNetDataset(foldername, device),
+        batch_size=MINIBATCH_SIZE,
         shuffle=True,
         collate_fn=merge_samples_to_minibatch,
     )
 
 
-class H5PytorchDataset(torch.utils.data.Dataset):
-    def __init__(self, filename, device):
-        super(H5PytorchDataset, self).__init__()
-
-        self.h5pyfile = h5py.File(filename, "r")
+class ProteinNetDataset(torch.utils.data.Dataset):
+    def __init__(self, foldername, device):
+        super(ProteinNetDataset, self).__init__()
+        self.foldername = foldername
+        self.filenames = listdir(foldername)
         self.device = device
-        self.num_proteins, self.max_sequence_len = self.h5pyfile["primary"].shape
 
     def __getitem__(self, index):
-        lengths = torch.tensor(
-            self.h5pyfile["length"][index, :], dtype=torch.int32, device=self.device
-        )
+        protein = np.load(self.foldername + self.filenames[index])
+        length = torch.tensor(protein["length"], dtype=torch.int32, device=self.device)
         primary = torch.tensor(
-            self.h5pyfile["primary"][index, :], dtype=torch.uint8, device=self.device
+            protein["primary"], dtype=torch.uint8, device=self.device
         )
         evolutionary = torch.tensor(
-            self.h5pyfile["evolutionary"][index, :],
-            dtype=torch.float,
-            device=self.device,
+            protein["evolutionary"], dtype=torch.float, device=self.device
         )
-        # secondary = torch.tensor(
-        #     self.h5pyfile["secondary"][index, :], dtype=torch.uint8, device=self.device
-        # )
-        phi = torch.tensor(
-            self.h5pyfile["phi"][index, :], dtype=torch.float, device=self.device
-        )
-        psi = torch.tensor(
-            self.h5pyfile["psi"][index, :], dtype=torch.float, device=self.device
-        )
-        return lengths, primary, evolutionary, phi, psi
+        # secondary = torch.tensor(protein["secondary"], dtype=torch.uint8, device=self.device)
+        phi = torch.tensor(protein["phi"], dtype=torch.float, device=self.device)
+        psi = torch.tensor(protein["psi"], dtype=torch.float, device=self.device)
+        return length, primary, evolutionary, phi, psi
 
     def __len__(self):
-        return self.num_proteins
+        return len(self.filenames)
 
 
 def merge_samples_to_minibatch(samples):
-    samples_list = []
-    for s in samples:
-        samples_list.append(s)
-    # sort according to length of aa sequence
-    samples_list.sort(key=lambda x: len(x[0]), reverse=True)
+    samples.sort(key=lambda x: x[0], reverse=True)
     return zip(*samples_list)
 
 
-def set_experiment_id(data_set_identifier, learning_rate, minibatch_size):
+def set_experiment_id(data_set_identifier):
     output_string = datetime.now().strftime("%Y-%m-%d_%H_%M_%S")
     output_string += "-" + data_set_identifier
-    output_string += "-LR" + str(learning_rate).replace(".", "_")
-    output_string += "-MB" + str(minibatch_size)
+    output_string += "-LR" + str(LEARNING_RATE).replace(".", "_")
+    output_string += "-MB" + str(MINIBATCH_SIZE)
     globals().__setitem__("experiment_id", output_string)
 
 

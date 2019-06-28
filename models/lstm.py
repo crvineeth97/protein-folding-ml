@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from torch.nn.utils.rnn import pack_padded_sequence
+from parameters import MAX_PROTEIN_LENGTH
 
 # seed random generator for reproducibility
 # torch.manual_seed(42)
@@ -34,7 +35,7 @@ class LSTMModel(nn.Module):
         for i, prot in enumerate(primary):
             if embedding == "one_hot":
                 onehot = torch.zeros(
-                    [2000, 20], dtype=torch.float64, device=self.device
+                    [MAX_PROTEIN_LENGTH, 20], dtype=torch.float64, device=self.device
                 )
                 onehot = onehot.scatter_(1, prot.view(-1, 1).type(torch.long), 1)
                 features.append(onehot)

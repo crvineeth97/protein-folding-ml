@@ -1,11 +1,9 @@
-from glob import glob
-from os import remove
-from os.path import isfile
+from os import makedirs, listdir
+from os.path import exists
+from shutil import rmtree
 
 import numpy as np
-from h5py import File
 
-from parameters import MAX_PROTEIN_LENGTH
 from util import (
     DSSP_DICT,
     MASK_DICT,
@@ -113,67 +111,10 @@ def read_protein_from_file(file_pointer):
             return None
 
 
-def process_file(input_file, output_file):
+def process_file(input_file, output_folder):
     print("Processing raw data file", input_file)
-    # Means resize every 50 proteins
-    mini_batch_size = 50
-    idx = 0
-    # Create h5py output file
-    f = File(output_file, "w")
-
-    # The following variables are datasets of the h5py file
-    # Can add more information if available
-    dsetl = f.create_dataset(
-        "length", (mini_batch_size, 1), maxshape=(None, 1), dtype="int32"
-    )
-    dset1 = f.create_dataset(
-        "primary",
-        (mini_batch_size, MAX_PROTEIN_LENGTH),
-        maxshape=(None, MAX_PROTEIN_LENGTH),
-        dtype="uint8",
-    )
-    dset2 = f.create_dataset(
-        "evolutionary",
-        (mini_batch_size, MAX_PROTEIN_LENGTH, 21),
-        maxshape=(None, MAX_PROTEIN_LENGTH, 21),
-        dtype="float",
-    )
-    # No secondary information available in ProteinNet
-    # Skipping this for now
-    # dset3 = f.create_dataset(
-    #     "secondary",
-    #     (mini_batch_size, MAX_PROTEIN_LENGTH),
-    #     maxshape=(None, MAX_PROTEIN_LENGTH),
-    #     dtype="uint8",
-    # )
-    # dset4 = f.create_dataset(
-    #     "tertiary",
-    #     (mini_batch_size, MAX_PROTEIN_LENGTH, 9),
-    #     maxshape=(None, MAX_PROTEIN_LENGTH, 9),
-    #     dtype="float",
-    # )
-    # Instead of storing tertiary data, let us store the phi, psi angles
-    dset4 = f.create_dataset(
-        "phi",
-        (mini_batch_size, MAX_PROTEIN_LENGTH),
-        maxshape=(None, MAX_PROTEIN_LENGTH),
-        dtype="float",
-    )
-    dset5 = f.create_dataset(
-        "psi",
-        (mini_batch_size, MAX_PROTEIN_LENGTH),
-        maxshape=(None, MAX_PROTEIN_LENGTH),
-        dtype="float",
-    )
-    # No need to store the masks
-    # dset5 = f.create_dataset(
-    #     "mask",
-    #     (mini_batch_size, MAX_PROTEIN_LENGTH),
-    #     maxshape=(None, MAX_PROTEIN_LENGTH),
-    #     dtype="uint8",
-    # )
-
     input_file_pointer = open("data/raw/" + input_file, "r")
+    idx = 0
 
     while True:
         # While there's more proteins to process
@@ -184,15 +125,6 @@ def process_file(input_file, output_file):
             break
 
         sequence_length = len(protein["primary"])
-
-        if sequence_length > MAX_PROTEIN_LENGTH:
-            print(
-                "Protein "
-                + protein["id"]
-                + " is too large and will not be considered. Length = "
-                + str(sequence_length)
-            )
-            continue
         primary_masked = masked_select(protein["primary"], protein["mask"])
         evolutionary_reshaped = np.array(protein["evolutionary"]).T
         evolutionary_masked = masked_select(evolutionary_reshaped, protein["mask"])
@@ -222,44 +154,25 @@ def process_file(input_file, output_file):
 
         # print(protein["id"])
         masked_length = len(primary_masked)
-
-        primary_padded = np.zeros(MAX_PROTEIN_LENGTH)
-        evolutionary_padded = np.zeros((MAX_PROTEIN_LENGTH, 21))
-        # secondary_padded = np.zeros(MAX_PROTEIN_LENGTH)
-        phi_padded = np.zeros(MAX_PROTEIN_LENGTH)
-        psi_padded = np.zeros(MAX_PROTEIN_LENGTH)
-
-        primary_padded[:masked_length] = primary_masked
-        evolutionary_padded[:masked_length] = evolutionary_masked
         assert len(evolutionary_masked) == masked_length
-        # secondary_padded[:masked_length] = secondary_masked
         # assert len(secondary_masked) == masked_length
         phi = calculate_phi_from_masked_tertiary(tertiary_masked)
         assert len(phi) == masked_length
-        phi_padded[:masked_length] = phi
         psi = calculate_psi_from_masked_tertiary(tertiary_masked)
         assert len(psi) == masked_length
-        psi_padded[:masked_length] = psi
 
-        dsetl[idx] = [masked_length]
-        dset1[idx] = primary_padded
-        dset2[idx] = evolutionary_padded
-        # dset3[idx] = secondary_padded
-        dset4[idx] = phi_padded
-        dset5[idx] = psi_padded
+        np.savez(
+            output_folder + protein["id"] + ".npz",
+            length=np.array(masked_length),
+            primary=primary_masked,
+            evolutionary=evolutionary_masked,
+            phi=phi,
+            psi=psi,
+        )
         idx += 1
 
-        if idx % mini_batch_size == 0:
-            resize_shape = (idx / mini_batch_size + 1) * mini_batch_size
-            dsetl.resize((resize_shape, 1))
-            dset1.resize((resize_shape, MAX_PROTEIN_LENGTH))
-            dset2.resize((resize_shape, MAX_PROTEIN_LENGTH, 21))
-            # dset3.resize((resize_shape, MAX_PROTEIN_LENGTH))
-            dset4.resize((resize_shape, MAX_PROTEIN_LENGTH))
-            dset5.resize((resize_shape, MAX_PROTEIN_LENGTH))
-
     input_file_pointer.close()
-    print("Wrote output of ", idx, " proteins to ", output_file)
+    print("Wrote output of ", idx, " proteins to ", output_folder, " folder")
 
 
 def filter_input_files(input_files):
@@ -274,24 +187,22 @@ def filter_input_files(input_files):
 def process_raw_data(force_pre_processing_overwrite=False):
     print("Starting pre-processing of raw data...")
 
-    input_files = glob("data/raw/*")
+    input_files = listdir("data/raw/")
     input_files_filtered = filter_input_files(input_files)
-    for file_path in input_files_filtered:
-        filename = file_path.split("/")[-1]
-        preprocessed_file_name = "data/preprocessed/" + filename + ".hdf5"
-
-        # check if we should remove the any previously processed files
-        if isfile(preprocessed_file_name):
-            print("Preprocessed file for " + filename + " already exists.")
-            if force_pre_processing_overwrite:
-                print(
-                    "force_pre_processing_overwrite flag set to True, overwriting old file..."
-                )
-                remove(preprocessed_file_name)
-            else:
-                print("Skipping pre-processing for this file...")
-
-        if not isfile(preprocessed_file_name):
-            process_file(filename, preprocessed_file_name)
+    for filename in input_files_filtered:
+        preprocessed_folder_path = "data/preprocessed/" + filename + "/"
+        if force_pre_processing_overwrite:
+            rmtree(preprocessed_folder_path)
+        if not exists(preprocessed_folder_path):
+            makedirs(preprocessed_folder_path)
+        else:
+            print(
+                "Preprocessed files already present in",
+                preprocessed_folder_path,
+                "directory. Use --force-pre-processing-overwrite",
+                "or delete the folder manually to overwrite",
+            )
+            continue
+        process_file(filename, preprocessed_folder_path)
 
     print("Completed pre-processing.")
