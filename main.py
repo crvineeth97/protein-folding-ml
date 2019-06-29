@@ -3,6 +3,7 @@
 #
 # @author Jeppe Hallgren
 # @author Vineeth Chelur
+# @author Yashas Samaga
 #
 # For license information, please see the LICENSE file in the root directory.
 
@@ -13,15 +14,14 @@ import time
 import numpy as np
 import requests
 import torch
-import torch.optim as optim
-import torch.utils.data
 
+from constants import EVAL_INTERVAL, LEARNING_RATE, MIN_UPDATES, MINIBATCH_SIZE
 from dashboard import start_dashboard_server
-from models import LSTMModel
+from dataloader import contruct_dataloader_from_disk
+from models.resnet import ResNet
 from preprocessing import process_raw_data
 from util import (
-    calculate_dihedral_angels,
-    contruct_dataloader_from_disk,
+    calculate_dihedral_angles,
     evaluate_model,
     get_structure_from_angles,
     set_experiment_id,
@@ -31,95 +31,17 @@ from util import (
     write_to_pdb,
 )
 
-print("------------------------------------------------------------------")
-print("---------------------------- OpenProtein -------------------------")
-print("------------------------------------------------------------------")
 
-# TODO Add more arguments
-parser = argparse.ArgumentParser(description="OpenProtein version 0.1")
-parser.add_argument(
-    "--silent",
-    dest="silent",
-    action="store_true",
-    help="Dont print verbose debug statements.",
-)
-parser.add_argument(
-    "--hide-ui",
-    dest="hide_ui",
-    action="store_true",
-    default=False,
-    help="Hide loss graph and visualization UI while training goes on.",
-)
-parser.add_argument(
-    "--evaluate-on-test",
-    dest="evaluate_on_test",
-    action="store_true",
-    default=False,
-    help="Run model on test data.",
-)
-parser.add_argument(
-    "--eval-interval",
-    dest="eval_interval",
-    type=int,
-    default=5,
-    help="Evaluate model on validation set every n minibatches.",
-)
-parser.add_argument(
-    "--min-updates",
-    dest="minimum_updates",
-    type=int,
-    default=5000,
-    help="Minimum number of minibatch iterations.",
-)
-parser.add_argument(
-    "--minibatch-size",
-    dest="minibatch_size",
-    type=int,
-    default=128,
-    help="Size of each minibatch.",
-)
-parser.add_argument(
-    "--learning-rate",
-    dest="learning_rate",
-    type=float,
-    default=0.01,
-    help="Learning rate to use during training.",
-)
-parser.add_argument(
-    "--log-file",
-    dest="log_file",
-    type=str,
-    default="./output/train.log",
-    help="Print output to the given log file",
-)
-parser.add_argument(
-    "--debug-mode",
-    dest="debug_mode",
-    action="store_true",
-    default=False,
-    help="Enter debugging mode for a more detailed log",
-)
-parser.add_argument(
-    "--force-pre-processing-overwrite",
-    dest="force_pre_processing_overwrite",
-    action="store_true",
-    default=False,
-    help="Deletes already preprocessed data in data/preprocessed and uses the raw data again",
-)
+def train_model(data_set_identifier, train_folder, val_folder):
+    set_experiment_id(data_set_identifier)
 
-
-def train_model(
-    data_set_identifier, train_file, val_file, learning_rate, minibatch_size
-):
-    set_experiment_id(data_set_identifier, learning_rate, minibatch_size)
-
-    train_loader = contruct_dataloader_from_disk(train_file, minibatch_size, device)
-    validation_loader = contruct_dataloader_from_disk(val_file, minibatch_size, device)
+    train_loader = contruct_dataloader_from_disk(train_folder, device)
+    validation_loader = contruct_dataloader_from_disk(val_folder, device)
     validation_dataset_size = validation_loader.dataset.__len__()
 
-    model = LSTMModel(device)
+    model = ResNet(device)
 
-    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+    optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
     criterion = torch.nn.MSELoss()
 
     sample_num = list()
@@ -136,21 +58,22 @@ def train_model(
 
     while not stopping_condition_met:
         loss_tracker = np.zeros(0)
-        for minibatch_id, training_minibatch in enumerate(train_loader, 0):
+        for minibatch_id, training_minibatch in enumerate(train_loader):
             minibatches_proccesed += 1
+            # training_minibatch is a tuple of tuple of tensors except
+            # lengths, which is a tuple of ints
             lengths, primary, evolutionary, phi, psi = training_minibatch
+
             start_compute_loss = time.time()
-            # inp should be the feature vectors to send to the particular model
-            # primary is of shape [minibatch_size, MAX_SEQ_LEN]
-            inp = model.generate_input(primary, evolutionary, lengths)
-            # output of the model
-            # In our case: sin(phi), cos(phi), sin(psi), cos(psi)
+
+            # inp should be of shape [Batch, 41, Max_length]
+            inp = model.generate_input(lengths, primary, evolutionary)  # .cuda()
+            # target should be of shape [Batch, 4, Max_length]
+            target = model.generate_target(lengths, phi, psi)
+            # output should be of shape [Batch, 4, Max_length]
+            # sin(phi), cos(phi), sin(psi), cos(psi)
             output = model(inp)
-            target = torch.tensor(
-                [torch.sin(phi), torch.cos(phi), torch.sin(psi), torch.cos(psi)],
-                device=device,
-            )
-            loss = criterion(output, target)
+            loss = model.calculate_loss(lengths, criterion, output, target)
             optimizer.zero_grad()
             write_out("Train loss:", loss.item())
             start_compute_grad = time.time()
@@ -165,9 +88,10 @@ def train_model(
             )
             optimizer.step()
 
-            # for every eval_interval samples,
+            # for every EVAL_INTERVAL samples,
             # plot performance on the validation set
-            if minibatches_proccesed % ARGS.eval_interval == 0:
+            """
+            if minibatches_proccesed % EVAL_INTERVAL == 0:
 
                 write_out("Testing model on validation set...")
 
@@ -179,8 +103,8 @@ def train_model(
                 prim = data_total[0][0]
                 pos = data_total[0][1]
                 pos_pred = data_total[0][3]
-                angles = calculate_dihedral_angels(pos, device)
-                angles_pred = calculate_dihedral_angels(pos_pred, device)
+                angles = calculate_dihedral_angles(pos, device)
+                angles_pred = calculate_dihedral_angles(pos_pred, device)
                 write_to_pdb(get_structure_from_angles(prim, angles), "test")
                 write_to_pdb(get_structure_from_angles(prim, angles_pred), "test_pred")
                 if validation_loss < best_model_loss:
@@ -233,21 +157,38 @@ def train_model(
                         print(res.json())
 
                 if (
-                    minibatches_proccesed > ARGS.minimum_updates
+                    minibatches_proccesed > MIN_UPDATES
                     and minibatches_proccesed > best_model_minibatch_time * 2
                 ):
                     stopping_condition_met = True
                     break
-    write_result_summary(best_model_loss)
+                    """
+    # write_result_summary(best_model_loss)
     return best_model_path
 
 
-ARGS = parser.parse_known_args()[0]
-device = torch.device("cpu")
+# TODO Add more arguments
+parser = argparse.ArgumentParser(description="OpenProtein version 0.1")
+parser.add_argument(
+    "--hide-ui",
+    dest="hide_ui",
+    action="store_true",
+    default=False,
+    help="Hide loss graph and visualization UI while training goes on.",
+)
+parser.add_argument(
+    "--force-pre-processing-overwrite",
+    dest="force_pre_processing_overwrite",
+    action="store_true",
+    default=False,
+    help="Deletes already preprocessed data in data/preprocessed and uses the raw data again",
+)
 
+ARGS = parser.parse_known_args()[0]
 if ARGS.hide_ui:
     write_out("Live plot deactivated, see output folder for plot.")
 
+device = torch.device("cpu")
 if torch.cuda.is_available():
     write_out("CUDA is available, using GPU")
     device = torch.device("cuda")
@@ -257,14 +198,14 @@ if torch.cuda.is_available():
 if not ARGS.hide_ui:
     start_dashboard_server()
 
-process_raw_data(force_pre_processing_overwrite=False)
+start = time.time()
+process_raw_data(ARGS.force_pre_processing_overwrite)
+end = time.time()
 
-training_file = "data/preprocessed/training_30.hdf5"
-validation_file = "data/preprocessed/validation.hdf5"
-# testing_file = "data/preprocessed/testing.hdf5"
+print("Total Preprocessing Time: ", end - start)
 
-train_model_path = train_model(
-    "TRAIN", training_file, validation_file, ARGS.learning_rate, ARGS.minibatch_size
-)
+training_folder = "data/preprocessed/training_30/"
+validation_folder = "data/preprocessed/validation/"
+testing_folder = "data/preprocessed/testing/"
 
-print(train_model_path)
+train_model_path = train_model("TRAIN", training_folder, validation_folder)
