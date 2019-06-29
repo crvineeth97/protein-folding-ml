@@ -15,14 +15,13 @@ import numpy as np
 import requests
 import torch
 
+from constants import EVAL_INTERVAL, LEARNING_RATE, MIN_UPDATES, MINIBATCH_SIZE
 from dashboard import start_dashboard_server
+from dataloader import contruct_dataloader_from_disk
 from models.resnet import ResNet
-from models.lstm import LSTMModel
-from parameters import EVAL_INTERVAL, LEARNING_RATE, MIN_UPDATES, MAX_PROTEIN_LENGTH
 from preprocessing import process_raw_data
 from util import (
-    calculate_dihedral_angels,
-    contruct_dataloader_from_disk,
+    calculate_dihedral_angles,
     evaluate_model,
     get_structure_from_angles,
     set_experiment_id,
@@ -40,7 +39,7 @@ def train_model(data_set_identifier, train_folder, val_folder):
     validation_loader = contruct_dataloader_from_disk(val_folder, device)
     validation_dataset_size = validation_loader.dataset.__len__()
 
-    model = LSTMModel(device)
+    model = ResNet(device)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
     criterion = torch.nn.MSELoss()
@@ -61,37 +60,20 @@ def train_model(data_set_identifier, train_folder, val_folder):
         loss_tracker = np.zeros(0)
         for minibatch_id, training_minibatch in enumerate(train_loader):
             minibatches_proccesed += 1
-            primary, evolutionary, phi, psi = training_minibatch
-
-            batch_size = len(primary)
-            print(batch_size)
-            transformed_phi = torch.zeros(batch_size, 1, MAX_PROTEIN_LENGTH)
-            transformed_psi = torch.zeros(batch_size, 1, MAX_PROTEIN_LENGTH)
-
-            for i in range(batch_size):
-                transformed_phi[i] = phi[i]
-                transformed_psi[i] = psi[i]
+            # training_minibatch is a tuple of tuple of tensors except
+            # lengths, which is a tuple of ints
+            lengths, primary, evolutionary, phi, psi = training_minibatch
 
             start_compute_loss = time.time()
 
-            # expected input shape: [n, 40, L]
-            inp = model.generate_input(evolutionary, primary)  # .cuda()
-
-            # expected output shape: [n, 4, L]
+            # inp should be of shape [Batch, 41, Max_length]
+            inp = model.generate_input(lengths, primary, evolutionary)  # .cuda()
+            # target should be of shape [Batch, 4, Max_length]
+            target = model.generate_target(lengths, phi, psi)
+            # output should be of shape [Batch, 4, Max_length]
             # sin(phi), cos(phi), sin(psi), cos(psi)
             output = model(inp)
-            sin_phi_tensor = torch.sin(transformed_phi)
-            cos_phi_tensor = torch.cos(transformed_phi)
-            sin_psi_tensor = torch.sin(transformed_psi)
-            cos_psi_tensor = torch.cos(transformed_psi)
-            target = torch.stack(
-                (sin_phi_tensor, cos_phi_tensor, sin_psi_tensor, cos_psi_tensor),
-                device=device,
-            )
-            target = target.permute(2, 1, 0, 3)
-            target = target.reshape(1, batch_size, -1)
-            target = target.squeeze()
-            loss = criterion(output, target)
+            loss = model.calculate_loss(lengths, criterion, output, target)
             optimizer.zero_grad()
             write_out("Train loss:", loss.item())
             start_compute_grad = time.time()
@@ -108,6 +90,7 @@ def train_model(data_set_identifier, train_folder, val_folder):
 
             # for every EVAL_INTERVAL samples,
             # plot performance on the validation set
+            """
             if minibatches_proccesed % EVAL_INTERVAL == 0:
 
                 write_out("Testing model on validation set...")
@@ -120,8 +103,8 @@ def train_model(data_set_identifier, train_folder, val_folder):
                 prim = data_total[0][0]
                 pos = data_total[0][1]
                 pos_pred = data_total[0][3]
-                angles = calculate_dihedral_angels(pos, device)
-                angles_pred = calculate_dihedral_angels(pos_pred, device)
+                angles = calculate_dihedral_angles(pos, device)
+                angles_pred = calculate_dihedral_angles(pos_pred, device)
                 write_to_pdb(get_structure_from_angles(prim, angles), "test")
                 write_to_pdb(get_structure_from_angles(prim, angles_pred), "test_pred")
                 if validation_loss < best_model_loss:
@@ -179,7 +162,8 @@ def train_model(data_set_identifier, train_folder, val_folder):
                 ):
                     stopping_condition_met = True
                     break
-    write_result_summary(best_model_loss)
+                    """
+    # write_result_summary(best_model_loss)
     return best_model_path
 
 

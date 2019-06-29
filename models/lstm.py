@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 from torch.nn.utils.rnn import pack_padded_sequence
-from parameters import MAX_PROTEIN_LENGTH
 
 # seed random generator for reproducibility
 # torch.manual_seed(42)

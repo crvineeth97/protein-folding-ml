@@ -1,82 +1,17 @@
 import math
 import time
-from datetime import datetime
 import warnings
+from datetime import datetime
 
 import numpy as np
 import torch
-import torch.utils.data
 from Bio.PDB import PDBIO
-from os import listdir
 from PeptideBuilder import make_structure
-from parameters import MINIBATCH_SIZE, LEARNING_RATE
+
 import pnerf.pnerf as pnerf
+from constants import AA_ID_DICT, LEARNING_RATE, MINIBATCH_SIZE
 
 warnings.filterwarnings("error")
-AA_ID_DICT = {
-    "A": 0,
-    "C": 1,
-    "D": 2,
-    "E": 3,
-    "F": 4,
-    "G": 5,
-    "H": 6,
-    "I": 7,
-    "K": 8,
-    "L": 9,
-    "M": 10,
-    "N": 11,
-    "P": 12,
-    "Q": 13,
-    "R": 14,
-    "S": 15,
-    "T": 16,
-    "V": 17,
-    "W": 18,
-    "Y": 19,
-}
-
-DSSP_DICT = {"L": 0, "H": 1, "B": 2, "E": 3, "G": 4, "I": 5, "T": 6, "S": 7}
-MASK_DICT = {"-": 0, "+": 1}
-
-
-def contruct_dataloader_from_disk(foldername, device):
-    return torch.utils.data.DataLoader(
-        ProteinNetDataset(foldername, device),
-        batch_size=MINIBATCH_SIZE,
-        shuffle=True,
-        collate_fn=merge_samples_to_minibatch,
-    )
-
-
-class ProteinNetDataset(torch.utils.data.Dataset):
-    def __init__(self, foldername, device):
-        super(ProteinNetDataset, self).__init__()
-        self.foldername = foldername
-        self.filenames = listdir(foldername)
-        self.device = device
-
-    def __getitem__(self, index):
-        protein = np.load(self.foldername + self.filenames[index])
-        primary = torch.tensor(
-            protein["primary"], dtype=torch.uint8, device=self.device
-        )
-        evolutionary = torch.tensor(
-            protein["evolutionary"], dtype=torch.float, device=self.device
-        )
-        # secondary = torch.tensor(protein["secondary"], dtype=torch.uint8, device=self.device)
-        phi = torch.tensor(protein["phi"], dtype=torch.float, device=self.device)
-        psi = torch.tensor(protein["psi"], dtype=torch.float, device=self.device)
-        return primary, evolutionary, phi, psi
-
-    def __len__(self):
-        return len(self.filenames)
-
-
-def merge_samples_to_minibatch(samples):
-    samples.sort(key=lambda x: x[0].shape[0], reverse=True)
-    # Possibly pad the minibatch here itself?
-    return zip(*samples)
 
 
 def set_experiment_id(data_set_identifier):
@@ -223,7 +158,7 @@ def calculate_dihedral_angles_over_minibatch(atomic_coords_padded, batch_sizes, 
     atomic_coords = atomic_coords_padded.transpose(0, 1)
     for idx, _ in enumerate(batch_sizes):
         angles.append(
-            calculate_dihedral_angels(atomic_coords[idx][: batch_sizes[idx]], device)
+            calculate_dihedral_angles(atomic_coords[idx][: batch_sizes[idx]], device)
         )
     return torch.nn.utils.rnn.pad_packed_sequence(
         torch.nn.utils.rnn.pack_sequence(angles)
@@ -239,7 +174,7 @@ def protein_id_to_str(protein_id_list):
     return aa_list
 
 
-def calculate_dihedral_angels(atomic_coords, device):
+def calculate_dihedral_angles(atomic_coords, device):
 
     assert int(atomic_coords.shape[1]) == 9
     atomic_coords = atomic_coords.contiguous().view(-1, 3)
@@ -434,10 +369,6 @@ def calc_avg_drmsd_over_minibatch(
     return drmsd_avg / len(backbone_atoms_list)
 
 
-def encode_primary_string(primary):
-    return list([AA_ID_DICT[aa] for aa in primary])
-
-
 def intial_pos_from_aa_string(batch_aa_string):
     structures = []
     for aa_string in batch_aa_string:
@@ -484,83 +415,3 @@ def pass_messages(aa_features, message_transformation, device):
     transformed = message_transformation(aa_msg_pairs).view(aa_count, aa_count - 1, -1)
     transformed_sum = transformed.sum(dim=1)  # aa_count x output message size
     return transformed_sum
-
-
-def masked_select(data, mask, X=None):
-    """
-    This masked_select works slightly differently.
-    In the mask, there'll be a chain of 0s, all of these are not selected
-    Instead, they are replaced by a single value defined by X
-    This shows that the protein is discontinuous and we should not consider all
-    the amino acids as continuous after masking
-    Eg: data = [A, C, D, E, F, G, H, I, K, L, M, N] => Assume all are chars 'A'
-        mask = [1, 1, 0, 0, 0, 1, 1, 1, 0, 1, 1, 1]
-        X = 'X'
-        output = [A, C, X, G, H, I, X, L, M, N]
-        Without X, the output would mean that C and G are adjacent and therefore the
-        calculations of backbone angles will go wrong
-    """
-    output = []
-    for i, val in enumerate(mask):
-        if val == 1:
-            if i != 0 and mask[i - 1] == 0 and X is not None:
-                output.append(X)
-            output.append(data[i])
-    return np.array(output)
-
-
-def calculate_dihedral_from_points(points):
-    # Source: https://math.stackexchange.com/questions/47059/how-do-i-calculate-a-dihedral-angle-given-cartesian-coordinates
-    b = np.zeros((3, 3))
-    n = np.zeros((2, 3))
-    for i in range(1, 4):
-        b[i - 1] = points[i] - points[i - 1]
-    for i in range(1, 3):
-        tmp = np.cross(b[i - 1], b[i])
-        try:
-            n[i - 1] = tmp / np.linalg.norm(tmp)
-        except RuntimeWarning:
-            print("M", end="")
-    m = np.cross(n[0], b[1] / np.linalg.norm(b[1]))
-    x = np.dot(n[0], n[1])
-    y = np.dot(m, n[1])
-    return -np.arctan2(y, x)
-
-
-def calculate_phi_from_masked_tertiary(tertiary_masked):
-    flg = 0
-    phi = []
-    for i, aa in enumerate(tertiary_masked):
-        # If there were missing residues
-        if np.allclose(aa, np.zeros(9)):
-            flg = 0
-            continue
-        if flg == 0:
-            flg = 1
-            phi.append(0)
-            continue
-        points = np.zeros((4, 3))
-        points[0] = tertiary_masked[i - 1][6:]
-        points[1:] = np.reshape(aa, (3, 3))
-        phi.append(calculate_dihedral_from_points(points))
-    return np.array(phi) * 180.0 / np.pi
-
-
-def calculate_psi_from_masked_tertiary(tertiary_masked):
-    flg = 1
-    psi = []
-    sz = len(tertiary_masked)
-    for i, aa in enumerate(tertiary_masked):
-        # If there were missing residues
-        if i + 1 == sz or np.allclose(tertiary_masked[i + 1], np.zeros(9)):
-            flg = 0
-            psi.append(0)
-            continue
-        if flg == 0:
-            flg = 1
-            continue
-        points = np.zeros((4, 3))
-        points[0:3] = np.reshape(aa, (3, 3))
-        points[3] = tertiary_masked[i + 1][:3]
-        psi.append(calculate_dihedral_from_points(points))
-    return np.array(psi) * 180.0 / np.pi

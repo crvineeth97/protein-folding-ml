@@ -1,17 +1,95 @@
-from os import makedirs, listdir
+from os import listdir, makedirs
 from os.path import exists
 from shutil import rmtree
 
 import numpy as np
 
-from util import (
-    DSSP_DICT,
-    MASK_DICT,
-    calculate_phi_from_masked_tertiary,
-    calculate_psi_from_masked_tertiary,
-    encode_primary_string,
-    masked_select,
-)
+from constants import AA_ID_DICT, DSSP_DICT, MASK_DICT
+
+
+def encode_primary_string(primary):
+    return list([AA_ID_DICT[aa] for aa in primary])
+
+
+def calculate_dihedral_from_points(points):
+    # Source: https://math.stackexchange.com/questions/47059/how-do-i-calculate-a-dihedral-angle-given-cartesian-coordinates
+    b = np.zeros((3, 3))
+    n = np.zeros((2, 3))
+    for i in range(1, 4):
+        b[i - 1] = points[i] - points[i - 1]
+    for i in range(1, 3):
+        tmp = np.cross(b[i - 1], b[i])
+        try:
+            n[i - 1] = tmp / np.linalg.norm(tmp)
+        except RuntimeWarning:
+            print("M", end="")
+    m = np.cross(n[0], b[1] / np.linalg.norm(b[1]))
+    x = np.dot(n[0], n[1])
+    y = np.dot(m, n[1])
+    return -np.arctan2(y, x)
+
+
+def calculate_phi_from_masked_tertiary(tertiary_masked):
+    flg = 0
+    phi = []
+    for i, aa in enumerate(tertiary_masked):
+        # If there were missing residues
+        if np.allclose(aa, np.zeros(9)):
+            flg = 0
+            continue
+        if flg == 0:
+            flg = 1
+            phi.append(0)
+            continue
+        points = np.zeros((4, 3))
+        points[0] = tertiary_masked[i - 1][6:]
+        points[1:] = np.reshape(aa, (3, 3))
+        phi.append(calculate_dihedral_from_points(points))
+    return np.array(phi, dtype=np.float) * 180.0 / np.pi
+
+
+def calculate_psi_from_masked_tertiary(tertiary_masked):
+    flg = 1
+    psi = []
+    sz = len(tertiary_masked)
+    for i, aa in enumerate(tertiary_masked):
+        # If there were missing residues
+        if i + 1 == sz or np.allclose(tertiary_masked[i + 1], np.zeros(9)):
+            flg = 0
+            psi.append(0)
+            continue
+        if flg == 0:
+            flg = 1
+            continue
+        points = np.zeros((4, 3))
+        points[0:3] = np.reshape(aa, (3, 3))
+        points[3] = tertiary_masked[i + 1][:3]
+        psi.append(calculate_dihedral_from_points(points))
+    return np.array(psi, dtype=np.float) * 180.0 / np.pi
+
+
+def masked_select(data, mask, X=None):
+    """
+    This masked_select works slightly differently.
+    In the mask, there'll be a chain of 0s, all of these are not selected
+    Instead, they are replaced by a single value defined by X
+    This shows that the protein is discontinuous and we should not consider all
+    the amino acids as continuous after masking
+    Eg: data = [A, C, D, E, F, G, H, I, K, L, M, N] => Assume all are chars 'A'
+        mask = [1, 1, 0, 0, 0, 1, 1, 1, 0, 1, 1, 1]
+        X = 'X'
+        output = [A, C, X, G, H, I, X, L, M, N]
+        Without X, the output would mean that C and G are adjacent and therefore the
+        calculations of backbone angles will go wrong
+    The above is just an example and this function is not applied to the primary sequence
+    """
+    output = []
+    for i, val in enumerate(mask):
+        if val == 1:
+            if i != 0 and mask[i - 1] == 0 and X is not None:
+                output.append(X)
+            output.append(data[i])
+    return output
 
 
 def read_protein_from_file(file_pointer):
@@ -125,16 +203,25 @@ def process_file(input_file, output_folder):
             break
 
         sequence_length = len(protein["primary"])
-        primary_masked = masked_select(protein["primary"], protein["mask"])
+        primary_masked = np.array(
+            masked_select(protein["primary"], protein["mask"]), dtype=np.uint8
+        )
         evolutionary_reshaped = np.array(protein["evolutionary"]).T
-        evolutionary_masked = masked_select(evolutionary_reshaped, protein["mask"])
-        # secondary_masked = masked_select(protein["secondary"], protein["mask"])
+        evolutionary_masked = np.array(
+            masked_select(evolutionary_reshaped, protein["mask"]), dtype=np.float
+        )
+        # secondary_masked = np.array(
+        #     masked_select(protein["secondary"], protein["mask"]), dtype=np.uint8
+        # )
         tertiary_transposed = np.ravel(np.array(protein["tertiary"]).T)
         tertiary_reshaped = (
             np.reshape(tertiary_transposed, (sequence_length, 9)) / 100.0
         )
         # Putting np.zeros(9) as a signal of missing residues
-        tertiary_masked = masked_select(tertiary_reshaped, protein["mask"], np.zeros(9))
+        tertiary_masked = np.array(
+            masked_select(tertiary_reshaped, protein["mask"], np.zeros(9)),
+            dtype=np.float,
+        )
         # If the first few residues were missing, no need to consider them
         if np.allclose(tertiary_masked[0], np.zeros(9)):
             tertiary_masked = tertiary_masked[1:]
