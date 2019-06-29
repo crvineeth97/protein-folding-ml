@@ -18,13 +18,7 @@ import torch
 from dashboard import start_dashboard_server
 from models.resnet import ResNet
 from models.lstm import LSTMModel
-from parameters import (
-    EVAL_INTERVAL,
-    LEARNING_RATE,
-    MIN_UPDATES,
-    MINIBATCH_SIZE,
-    MAX_PROTEIN_LENGTH,
-)
+from parameters import EVAL_INTERVAL, LEARNING_RATE, MIN_UPDATES, MAX_PROTEIN_LENGTH
 from preprocessing import process_raw_data
 from util import (
     calculate_dihedral_angels,
@@ -67,7 +61,7 @@ def train_model(data_set_identifier, train_folder, val_folder):
         loss_tracker = np.zeros(0)
         for minibatch_id, training_minibatch in enumerate(train_loader):
             minibatches_proccesed += 1
-            lengths, primary, evolutionary, phi, psi = training_minibatch
+            primary, evolutionary, phi, psi = training_minibatch
 
             batch_size = len(primary)
             print(batch_size)
@@ -81,7 +75,7 @@ def train_model(data_set_identifier, train_folder, val_folder):
             start_compute_loss = time.time()
 
             # expected input shape: [n, 40, L]
-            inp = model.generate_input(evolutionary, primary, lengths)  # .cuda()
+            inp = model.generate_input(evolutionary, primary)  # .cuda()
 
             # expected output shape: [n, 4, L]
             # sin(phi), cos(phi), sin(psi), cos(psi)

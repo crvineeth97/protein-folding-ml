@@ -163,7 +163,6 @@ def process_file(input_file, output_folder):
 
         np.savez(
             output_folder + protein["id"] + ".npz",
-            length=np.array(masked_length),
             primary=primary_masked,
             evolutionary=evolutionary_masked,
             phi=phi,

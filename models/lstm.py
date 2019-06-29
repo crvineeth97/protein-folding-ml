@@ -23,7 +23,7 @@ class LSTMModel(nn.Module):
         self.fc2 = nn.Linear(in_features=512, out_features=256)
         self.fc3 = nn.Linear(in_features=256, out_features=out_dims)
 
-    def generate_input(self, primary, evolutionary, lengths, embedding="one_hot"):
+    def generate_input(self, primary, evolutionary, embedding="one_hot"):
         """
         primary is of shape [minibatch_size, MAX_SEQ_LEN]
         """

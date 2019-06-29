@@ -58,7 +58,6 @@ class ProteinNetDataset(torch.utils.data.Dataset):
 
     def __getitem__(self, index):
         protein = np.load(self.foldername + self.filenames[index])
-        length = torch.tensor(protein["length"], dtype=torch.int32, device=self.device)
         primary = torch.tensor(
             protein["primary"], dtype=torch.uint8, device=self.device
         )
@@ -68,15 +67,16 @@ class ProteinNetDataset(torch.utils.data.Dataset):
         # secondary = torch.tensor(protein["secondary"], dtype=torch.uint8, device=self.device)
         phi = torch.tensor(protein["phi"], dtype=torch.float, device=self.device)
         psi = torch.tensor(protein["psi"], dtype=torch.float, device=self.device)
-        return length, primary, evolutionary, phi, psi
+        return primary, evolutionary, phi, psi
 
     def __len__(self):
         return len(self.filenames)
 
 
 def merge_samples_to_minibatch(samples):
-    samples.sort(key=lambda x: x[0], reverse=True)
-    return zip(*samples_list)
+    samples.sort(key=lambda x: x[0].shape[0], reverse=True)
+    # Possibly pad the minibatch here itself?
+    return zip(*samples)
 
 
 def set_experiment_id(data_set_identifier):
