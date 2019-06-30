@@ -11,8 +11,8 @@ class ResNet(nn.Module):
         self.device = device
 
         self.reslay = resnet34()
-        self.fc1 = nn.Linear(1024, 128)
-        self.fc2 = nn.Linear(128, 4)
+        self.fc1 = nn.Linear(512, 64)
+        self.fc2 = nn.Linear(64, 4)
 
     def generate_input(self, lengths, primary, evolutionary):
         """
@@ -62,19 +62,19 @@ class ResNet(nn.Module):
     def calculate_loss(self, lengths, criterion, output, target):
         loss = criterion(output[0], target[0])
         for i in range(1, MINIBATCH_SIZE):
-            loss += criterion(output[i][: lengths[i]], target[i][: lengths[i]])
+            loss += criterion(output[i, :, : lengths[i]], target[i, :, : lengths[i]])
         loss /= MINIBATCH_SIZE
         return loss
 
     def forward(self, input):
         # [Batch, 41, Max_length]
         output = self.reslay(input)
-        # [Batch, 1024, Max_length]
+        # [Batch, 512, Max_length]
         output = output.transpose(1, 2)
-        # [Batch, Max_length, 1024]
+        # [Batch, Max_length, 512]
         output = self.fc1(output)
         output = nn.functional.relu(output)
-        # [Batch, Max_length, 128)]
+        # [Batch, Max_length, 64)]
         output = self.fc2(output)
         output = torch.tanh(output)
         # [Batch, Max_length, 4)]

@@ -39,7 +39,7 @@ def train_model(data_set_identifier, train_folder, val_folder):
     validation_loader = contruct_dataloader_from_disk(val_folder, device)
     validation_dataset_size = validation_loader.dataset.__len__()
 
-    model = ResNet(device)
+    model = ResNet(device).to(device)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
     criterion = torch.nn.MSELoss()
