@@ -30,10 +30,17 @@ def calculate_dihedral_from_points(points):
 
 
 def calculate_phi_from_masked_tertiary(tertiary_masked):
+    """
+    The phi angle of an amino acid at the i'th position is calculated
+    using the coordinates of the C{i-1}, N{i}, Ca{i}, C{i} atoms. Hence,
+    the phi angle of the first amino acid is always 0
+    """
     flg = 0
     phi = []
     for i, aa in enumerate(tertiary_masked):
-        # If there were missing residues
+        # If there were missing residues, we don't have their tertiary
+        # positions and hence phi will be 0 for the first amino acid
+        # after the missing residues, because we don't have C{i-1}
         if np.allclose(aa, np.zeros(9)):
             flg = 0
             continue
@@ -49,11 +56,18 @@ def calculate_phi_from_masked_tertiary(tertiary_masked):
 
 
 def calculate_psi_from_masked_tertiary(tertiary_masked):
+    """
+    The psi angle of an amino acid at the i'th position is calculated
+    using the coordinates of the N{i}, Ca{i}, C{i}, N{i+1} atoms. Hence,
+    the psi angle of the last amino acid is always 0
+    """
     flg = 1
     psi = []
     sz = len(tertiary_masked)
     for i, aa in enumerate(tertiary_masked):
-        # If there were missing residues
+        # If there were missing residues, we don't have their tertiary
+        # positions and hence psi will be 0 for the last amino acid
+        # before the missing residues, because we don't have N{i+1}
         if i + 1 == sz or np.allclose(tertiary_masked[i + 1], np.zeros(9)):
             flg = 0
             psi.append(0)
@@ -66,6 +80,33 @@ def calculate_psi_from_masked_tertiary(tertiary_masked):
         points[3] = tertiary_masked[i + 1][:3]
         psi.append(calculate_dihedral_from_points(points))
     return np.array(psi, dtype=np.float) * 180.0 / np.pi
+
+
+def calculate_omega_from_masked_tertiary(tertiary_masked):
+    """
+    The omega angle of an amino acid at the i'th position is calculated
+    using the coordinates of the Ca{i}, C{i}, N{i+1}, Ca{i+1} atoms. Hence,
+    the omega angle of the last amino acid is always 0
+    """
+    flg = 0
+    omega = []
+    sz = len(tertiary_masked)
+    for i, aa in enumerate(tertiary_masked):
+        # If there were missing residues, we don't have their tertiary
+        # positions and hence omega will be 0 for the last amino acid
+        # before the missing residues, because we don't have C{i-1}
+        if i + 1 == sz or np.allclose(tertiary_masked[i + 1], np.zeros(9)):
+            flg = 0
+            omega.append(0)
+            continue
+        if flg == 0:
+            flg = 1
+            continue
+        points = np.zeros((4, 3))
+        points[0:2] = np.reshape(aa[3:], (2, 3))
+        points[2:] = np.reshape(tertiary_masked[i + 1][:6], (2, 3))
+        omega.append(calculate_dihedral_from_points(points))
+    return np.array(omega, dtype=np.float) * 180.0 / np.pi
 
 
 def masked_select(data, mask, X=None):
@@ -261,6 +302,87 @@ def process_file(input_file, output_folder):
     print("Wrote output of ", idx, " proteins to ", output_folder, " folder")
 
 
+def process_file_no_missing(input_file, output_folder):
+    print("Processing raw data file", input_file)
+    input_file_pointer = open("data/raw/" + input_file, "r")
+    idx = 0
+
+    while True:
+        # While there's more proteins to process
+        protein = read_protein_from_file(input_file_pointer)
+        if protein == {}:
+            continue
+        if protein is None:
+            break
+
+        mask_flg = 0
+        skip_flg = 0
+        for i, aa in enumerate(protein["mask"]):
+            if aa:
+                mask_flg = 1
+            elif mask_flg:
+                skip_flg = 1
+                mask_flg = 0
+
+        sequence_length = len(protein["primary"])
+        primary_masked = np.array(
+            masked_select(protein["primary"], protein["mask"]), dtype=np.uint8
+        )
+        evolutionary_reshaped = np.array(protein["evolutionary"]).T
+        evolutionary_masked = np.array(
+            masked_select(evolutionary_reshaped, protein["mask"]), dtype=np.float
+        )
+        # secondary_masked = np.array(
+        #     masked_select(protein["secondary"], protein["mask"]), dtype=np.uint8
+        # )
+        tertiary_transposed = np.ravel(np.array(protein["tertiary"]).T)
+        tertiary_reshaped = (
+            np.reshape(tertiary_transposed, (sequence_length, 9)) / 100.0
+        )
+        # Putting np.zeros(9) as a signal of missing residues
+        tertiary_masked = np.array(
+            masked_select(tertiary_reshaped, protein["mask"], np.zeros(9)),
+            dtype=np.float,
+        )
+        # If the first few residues were missing, no need to consider them
+        if np.allclose(tertiary_masked[0], np.zeros(9)):
+            tertiary_masked = tertiary_masked[1:]
+        # There are problems with some of the proteins in the dataset
+        # Skip if that is the case
+        skip_flg = 0
+        for coords in tertiary_masked:
+            if not np.allclose(coords, np.zeros(9)) and (
+                np.allclose(coords[:3], np.zeros(3))
+                or np.allclose(coords[3:6], np.zeros(3))
+                or np.allclose(coords[6:], np.zeros(3))
+            ):
+                skip_flg = 1
+                break
+        if skip_flg:
+            continue
+
+        # print(protein["id"])
+        masked_length = len(primary_masked)
+        assert len(evolutionary_masked) == masked_length
+        # assert len(secondary_masked) == masked_length
+        phi = calculate_phi_from_masked_tertiary(tertiary_masked)
+        assert len(phi) == masked_length
+        psi = calculate_psi_from_masked_tertiary(tertiary_masked)
+        assert len(psi) == masked_length
+
+        np.savez(
+            output_folder + protein["id"] + ".npz",
+            primary=primary_masked,
+            evolutionary=evolutionary_masked,
+            phi=phi,
+            psi=psi,
+        )
+        idx += 1
+
+    input_file_pointer.close()
+    print("Wrote output of ", idx, " proteins to ", output_folder, " folder")
+
+
 def filter_input_files(input_files):
     """
     Returns a list of files that do not have the provided
@@ -290,5 +412,8 @@ def process_raw_data(force_pre_processing_overwrite=False):
             )
             continue
         process_file(filename, preprocessed_folder_path)
+        process_file_no_missing(
+            filename, preprocessed_folder_path[:-1] + "_no_missing/"
+        )
 
     print("Completed pre-processing.")

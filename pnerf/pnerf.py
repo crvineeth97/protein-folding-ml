@@ -40,8 +40,8 @@ def dihedral_to_point(
     r_sin_theta = torch.tensor(
         bond_lengths * np.sin(np.pi - bond_angles), device=device
     )
-    dihedral_cos = torch.cos(dihedral, device=device)
-    dihedral_sin = torch.sin(dihedral, device=device)
+    dihedral_cos = torch.cos(dihedral)
+    dihedral_sin = torch.sin(dihedral)
 
     point_x = r_cos_theta.view(1, 1, -1).repeat(num_steps, batch_size, 1)
     point_y = dihedral_cos * r_sin_theta
