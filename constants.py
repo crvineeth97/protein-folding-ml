@@ -1,5 +1,5 @@
 # Size of a minibatch during training
-MINIBATCH_SIZE = 128
+MINIBATCH_SIZE = 1
 
 # Learning rate of the implemented model during training
 LEARNING_RATE = 0.01

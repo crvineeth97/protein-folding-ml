@@ -204,8 +204,8 @@ end = time.time()
 
 print("Total Preprocessing Time: ", end - start)
 
-training_folder = "data/preprocessed/training_30/"
-validation_folder = "data/preprocessed/validation/"
-testing_folder = "data/preprocessed/testing/"
+training_folder = "data/preprocessed/training_30_no_missing/"
+validation_folder = "data/preprocessed/validation_no_missing/"
+testing_folder = "data/preprocessed/testing_no_missing/"
 
 train_model_path = train_model("TRAIN", training_folder, validation_folder)

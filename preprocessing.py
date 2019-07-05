@@ -315,14 +315,16 @@ def process_file_no_missing(input_file, output_folder):
         if protein is None:
             break
 
-        mask_flg = 0
         skip_flg = 0
-        for i, aa in enumerate(protein["mask"]):
-            if aa:
-                mask_flg = 1
-            elif mask_flg:
+        prv = 0
+        for ind, el in enumerate(np.argwhere(protein["mask"])):
+            if ind != 0 and el != prv + 1:
                 skip_flg = 1
-                mask_flg = 0
+                break
+            prv = el
+
+        if skip_flg:
+            continue
 
         sequence_length = len(protein["primary"])
         primary_masked = np.array(
@@ -403,6 +405,7 @@ def process_raw_data(force_pre_processing_overwrite=False):
             rmtree(preprocessed_folder_path)
         if not exists(preprocessed_folder_path):
             makedirs(preprocessed_folder_path)
+            process_file(filename, preprocessed_folder_path)
         else:
             print(
                 "Preprocessed files already present in",
@@ -410,10 +413,17 @@ def process_raw_data(force_pre_processing_overwrite=False):
                 "directory. Use --force-pre-processing-overwrite",
                 "or delete the folder manually to overwrite",
             )
-            continue
-        process_file(filename, preprocessed_folder_path)
-        process_file_no_missing(
-            filename, preprocessed_folder_path[:-1] + "_no_missing/"
-        )
+        if not exists(preprocessed_folder_path[:-1] + "_no_missing/"):
+            makedirs(preprocessed_folder_path[:-1] + "_no_missing/")
+            process_file_no_missing(
+                filename, preprocessed_folder_path[:-1] + "_no_missing/"
+            )
+        else:
+            print(
+                "Preprocessed files already present in",
+                preprocessed_folder_path[:-1] + "_no_missing/",
+                "directory. Use --force-pre-processing-overwrite",
+                "or delete the folder manually to overwrite",
+            )
 
     print("Completed pre-processing.")
