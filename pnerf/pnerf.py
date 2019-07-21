@@ -91,7 +91,7 @@ def point_to_coordinate(points, device, num_fragments=6):
         ],
         dtype=np.float32,
     )
-    init_matrix = torch.from_numpy(init_matrix, device=device)
+    init_matrix = torch.from_numpy(init_matrix)
     init_coords = [
         row.repeat([num_fragments * batch_size, 1]).view(
             num_fragments, batch_size, NUM_DIMENSIONS

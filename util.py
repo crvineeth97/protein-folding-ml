@@ -56,10 +56,10 @@ def evaluate_model(data_loader, model):
         # sin(phi), cos(phi), sin(psi), cos(psi)
         output = model(inp)
 
-        predicted_angles = np.arctan2(ouput[:, 0, :], output[:, 1, :])
+        predicted_angles = np.arctan2(output[:, 0, :], output[:, 1, :])
 
         backbone_atoms = get_backbone_positions_from_angular_prediction(
-            predicted_angles
+            predicted_angles, 
         )
 
         write_out("Apply model to validation minibatch:", time.time() - start)
