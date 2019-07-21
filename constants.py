@@ -39,3 +39,13 @@ DSSP_DICT = {"L": 0, "H": 1, "B": 2, "E": 3, "G": 4, "I": 5, "T": 6, "S": 7}
 
 # Masking values and their integer representation
 MASK_DICT = {"-": 0, "+": 1}
+
+# Deletes already preprocessed data in data/preprocessed and uses the raw data again
+# to regenerate the preprocessed data
+FORCE_PREPROCESSING_OVERWRITE = False
+
+# Hide the visualizaiton of the training
+HIDE_UI = True
+
+# If set to True, preprocess proteins that have missing residues in the middle
+PREPROCESS_WITH_MISSING_RESIDUES = False

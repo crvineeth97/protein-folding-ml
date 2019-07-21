@@ -4,7 +4,6 @@ import numpy as np
 import PeptideBuilder
 from Bio.PDB import PDBList, PDBParser, is_aa, PDBIO
 from Bio.PDB.Polypeptide import three_to_one
-from torch import device, from_numpy
 
 sys.path.append("../")
 from pnerf.pnerf import dihedral_to_point
@@ -84,7 +83,7 @@ def calculate_omega_from_masked_tertiary(tertiary_masked):
     using the coordinates of the Ca{i}, C{i}, N{i+1}, Ca{i+1} atoms. Hence,
     the omega angle of the last amino acid is always 0
     """
-    flg = 0
+    flg = 1
     omega = []
     sz = len(tertiary_masked)
     for i, aa in enumerate(tertiary_masked):
@@ -137,7 +136,7 @@ def get_backbone_coords(pdb_id):
     return primary, tertiary
 
 
-primary, tertiary = get_backbone_coords("1T38")
+primary, tertiary = get_backbone_coords("2YO0")
 phi = calculate_phi_from_masked_tertiary(tertiary)
 psi = calculate_psi_from_masked_tertiary(tertiary)
 omega = calculate_omega_from_masked_tertiary(tertiary)

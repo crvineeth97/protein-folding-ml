@@ -7,7 +7,6 @@
 #
 # For license information, please see the LICENSE file in the root directory.
 
-import argparse
 import math
 import time
 
@@ -15,7 +14,7 @@ import numpy as np
 import requests
 import torch
 
-from constants import EVAL_INTERVAL, LEARNING_RATE, MIN_UPDATES, MINIBATCH_SIZE
+from constants import EVAL_INTERVAL, LEARNING_RATE, MIN_UPDATES, HIDE_UI
 from dashboard import start_dashboard_server
 from dataloader import contruct_dataloader_from_disk
 from models.resnet import ResNet
@@ -90,7 +89,6 @@ def train_model(data_set_identifier, train_folder, val_folder):
 
             # for every EVAL_INTERVAL samples,
             # plot performance on the validation set
-            """
             if minibatches_proccesed % EVAL_INTERVAL == 0:
 
                 write_out("Testing model on validation set...")
@@ -128,7 +126,7 @@ def train_model(data_set_identifier, train_folder, val_folder):
                 validation_loss_values.append(validation_loss)
                 rmsd_avg_values.append(rmsd_avg)
                 drmsd_avg_values.append(drmsd_avg)
-                if not ARGS.hide_ui:
+                if not HIDE_UI:
                     data = {}
                     data["pdb_data_pred"] = open(
                         "output/protein_test_pred.pdb", "r"
@@ -162,30 +160,11 @@ def train_model(data_set_identifier, train_folder, val_folder):
                 ):
                     stopping_condition_met = True
                     break
-                    """
-    # write_result_summary(best_model_loss)
+    write_result_summary(best_model_loss)
     return best_model_path
 
 
-# TODO Add more arguments
-parser = argparse.ArgumentParser(description="OpenProtein version 0.1")
-parser.add_argument(
-    "--hide-ui",
-    dest="hide_ui",
-    action="store_true",
-    default=False,
-    help="Hide loss graph and visualization UI while training goes on.",
-)
-parser.add_argument(
-    "--force-pre-processing-overwrite",
-    dest="force_pre_processing_overwrite",
-    action="store_true",
-    default=False,
-    help="Deletes already preprocessed data in data/preprocessed and uses the raw data again",
-)
-
-ARGS = parser.parse_known_args()[0]
-if ARGS.hide_ui:
+if HIDE_UI:
     write_out("Live plot deactivated, see output folder for plot.")
 
 device = torch.device("cpu")
@@ -195,11 +174,11 @@ if torch.cuda.is_available():
 
 # Start web server
 # TODO Add more options to view as well as use GDT_TS for scoring
-if not ARGS.hide_ui:
+if not HIDE_UI:
     start_dashboard_server()
 
 start = time.time()
-process_raw_data(ARGS.force_pre_processing_overwrite)
+process_raw_data()
 end = time.time()
 
 print("Total Preprocessing Time: ", end - start)

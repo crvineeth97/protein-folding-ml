@@ -44,19 +44,29 @@ def evaluate_model(data_loader, model):
     dRMSD_list = []
     RMSD_list = []
     for i, data in enumerate(data_loader, 0):
-        primary_sequence, tertiary_positions, mask = data
+
+        # primary_sequence, tertiary_positions, mask = data
+        lengths, primary, evolutionary, phi, psi, tertiary = data
+
         start = time.time()
-        predicted_angles, backbone_atoms, batch_sizes = model(primary_sequence)
+        # predicted_angles, backbone_atoms, batch_sizes = model(primary_sequence)
+        # inp should be of shape [Batch, 41, Max_length]
+        inp = model.generate_input(lengths, primary, evolutionary)  # .cuda()
+        # output should be of shape [Batch, 4, Max_length]
+        # sin(phi), cos(phi), sin(psi), cos(psi)
+        output = model(inp)
+
+        predicted_angles = np.arctan2(ouput[:, 0, :], output[:, 1, :])
+
+        backbone_atoms = get_backbone_positions_from_angular_prediction(
+            predicted_angles
+        )
+
         write_out("Apply model to validation minibatch:", time.time() - start)
         cpu_predicted_angles = predicted_angles.transpose(0, 1).cpu().detach()
         cpu_predicted_backbone_atoms = backbone_atoms.transpose(0, 1).cpu().detach()
         minibatch_data = list(
-            zip(
-                primary_sequence,
-                tertiary_positions,
-                cpu_predicted_angles,
-                cpu_predicted_backbone_atoms,
-            )
+            zip(primary, tertiary, cpu_predicted_angles, cpu_predicted_backbone_atoms)
         )
         data_total.extend(minibatch_data)
         start = time.time()
@@ -328,11 +338,8 @@ def structure_to_backbone_atoms(structure):
     return torch.stack(predicted_coords).view(-1, 9)
 
 
-def get_backbone_positions_from_angular_prediction(
-    angular_emissions, batch_sizes, device
-):
-    # angular_emissions -1 x minibatch size x 3 (omega, phi, psi)
-    points = pnerf.dihedral_to_point(angular_emissions, device)
+def get_backbone_positions_from_angular_prediction(dihedrals, batch_sizes, device):
+    points = pnerf.dihedral_to_point(dihedrals, device)
     coordinates = (
         pnerf.point_to_coordinate(points, device) / 100
     )  # devide by 100 to angstrom unit

@@ -4,7 +4,13 @@ from shutil import rmtree
 
 import numpy as np
 
-from constants import AA_ID_DICT, DSSP_DICT, MASK_DICT
+from constants import (
+    AA_ID_DICT,
+    DSSP_DICT,
+    MASK_DICT,
+    FORCE_PREPROCESSING_OVERWRITE,
+    PREPROCESS_WITH_MISSING_RESIDUES,
+)
 
 
 def encode_primary_string(primary):
@@ -88,7 +94,7 @@ def calculate_omega_from_masked_tertiary(tertiary_masked):
     using the coordinates of the Ca{i}, C{i}, N{i+1}, Ca{i+1} atoms. Hence,
     the omega angle of the last amino acid is always 0
     """
-    flg = 0
+    flg = 1
     omega = []
     sz = len(tertiary_masked)
     for i, aa in enumerate(tertiary_masked):
@@ -117,9 +123,9 @@ def masked_select(data, mask, X=None):
     This shows that the protein is discontinuous and we should not consider all
     the amino acids as continuous after masking
     Eg: data = [A, C, D, E, F, G, H, I, K, L, M, N] => Assume all are chars 'A'
-        mask = [1, 1, 0, 0, 0, 1, 1, 1, 0, 1, 1, 1]
+        mask = [0, 0, 1, 0, 0, 1, 1, 1, 0, 1, 1, 0]
         X = 'X'
-        output = [A, C, X, G, H, I, X, L, M, N]
+        output = [X, D, X, G, H, I, X, L, M, X]
         Without X, the output would mean that C and G are adjacent and therefore the
         calculations of backbone angles will go wrong
     The above is just an example and this function is not applied to the primary sequence
@@ -133,7 +139,7 @@ def masked_select(data, mask, X=None):
     return output
 
 
-def read_protein_from_file(file_pointer):
+def read_protein(file_pointer):
     dict_ = {}
 
     is_protein_info_correct = True
@@ -230,18 +236,30 @@ def read_protein_from_file(file_pointer):
             return None
 
 
-def process_file(input_file, output_folder):
+def process_file(input_file, output_folder, save_tertiary):
     print("Processing raw data file", input_file)
     input_file_pointer = open("data/raw/" + input_file, "r")
     idx = 0
 
     while True:
         # While there's more proteins to process
-        protein = read_protein_from_file(input_file_pointer)
+        protein = read_protein(input_file_pointer)
         if protein == {}:
             continue
         if protein is None:
             break
+
+        if not PREPROCESS_WITH_MISSING_RESIDUES:
+            skip_flg = 0
+            prv = 0
+            for ind, el in enumerate(np.argwhere(protein["mask"])):
+                if ind != 0 and el != prv + 1:
+                    skip_flg = 1
+                    break
+                prv = el
+
+            if skip_flg:
+                continue
 
         sequence_length = len(protein["primary"])
         primary_masked = np.array(
@@ -288,97 +306,28 @@ def process_file(input_file, output_folder):
         assert len(phi) == masked_length
         psi = calculate_psi_from_masked_tertiary(tertiary_masked)
         assert len(psi) == masked_length
+        omega = calculate_omega_from_masked_tertiary(tertiary_masked)
+        assert len(omega) == masked_length
 
-        np.savez(
-            output_folder + protein["id"] + ".npz",
-            primary=primary_masked,
-            evolutionary=evolutionary_masked,
-            phi=phi,
-            psi=psi,
-        )
-        idx += 1
-
-    input_file_pointer.close()
-    print("Wrote output of ", idx, " proteins to ", output_folder, " folder")
-
-
-def process_file_no_missing(input_file, output_folder):
-    print("Processing raw data file", input_file)
-    input_file_pointer = open("data/raw/" + input_file, "r")
-    idx = 0
-
-    while True:
-        # While there's more proteins to process
-        protein = read_protein_from_file(input_file_pointer)
-        if protein == {}:
-            continue
-        if protein is None:
-            break
-
-        skip_flg = 0
-        prv = 0
-        for ind, el in enumerate(np.argwhere(protein["mask"])):
-            if ind != 0 and el != prv + 1:
-                skip_flg = 1
-                break
-            prv = el
-
-        if skip_flg:
-            continue
-
-        sequence_length = len(protein["primary"])
-        primary_masked = np.array(
-            masked_select(protein["primary"], protein["mask"]), dtype=np.uint8
-        )
-        evolutionary_reshaped = np.array(protein["evolutionary"]).T
-        evolutionary_masked = np.array(
-            masked_select(evolutionary_reshaped, protein["mask"]), dtype=np.float
-        )
-        # secondary_masked = np.array(
-        #     masked_select(protein["secondary"], protein["mask"]), dtype=np.uint8
-        # )
-        tertiary_transposed = np.ravel(np.array(protein["tertiary"]).T)
-        tertiary_reshaped = (
-            np.reshape(tertiary_transposed, (sequence_length, 9)) / 100.0
-        )
-        # Putting np.zeros(9) as a signal of missing residues
-        tertiary_masked = np.array(
-            masked_select(tertiary_reshaped, protein["mask"], np.zeros(9)),
-            dtype=np.float,
-        )
-        # If the first few residues were missing, no need to consider them
-        if np.allclose(tertiary_masked[0], np.zeros(9)):
-            tertiary_masked = tertiary_masked[1:]
-        # There are problems with some of the proteins in the dataset
-        # Skip if that is the case
-        skip_flg = 0
-        for coords in tertiary_masked:
-            if not np.allclose(coords, np.zeros(9)) and (
-                np.allclose(coords[:3], np.zeros(3))
-                or np.allclose(coords[3:6], np.zeros(3))
-                or np.allclose(coords[6:], np.zeros(3))
-            ):
-                skip_flg = 1
-                break
-        if skip_flg:
-            continue
-
-        # print(protein["id"])
-        masked_length = len(primary_masked)
-        assert len(evolutionary_masked) == masked_length
-        # assert len(secondary_masked) == masked_length
-        phi = calculate_phi_from_masked_tertiary(tertiary_masked)
-        assert len(phi) == masked_length
-        psi = calculate_psi_from_masked_tertiary(tertiary_masked)
-        assert len(psi) == masked_length
-
-        np.savez(
-            output_folder + protein["id"] + ".npz",
-            primary=primary_masked,
-            evolutionary=evolutionary_masked,
-            phi=phi,
-            psi=psi,
-        )
+        if save_tertiary:
+            np.savez(
+                output_folder + protein["id"] + ".npz",
+                primary=primary_masked,
+                evolutionary=evolutionary_masked,
+                phi=phi,
+                psi=psi,
+                omega=omega,
+                tertiary=tertiary_masked,
+            )
+        else:
+            np.savez(
+                output_folder + protein["id"] + ".npz",
+                primary=primary_masked,
+                evolutionary=evolutionary_masked,
+                phi=phi,
+                psi=psi,
+                omega=omega,
+            )
         idx += 1
 
     input_file_pointer.close()
@@ -394,34 +343,28 @@ def filter_input_files(input_files):
     return list(filter(lambda x: not x.endswith(disallowed_file_endings), input_files))
 
 
-def process_raw_data(force_pre_processing_overwrite=False):
+def process_raw_data():
     print("Starting pre-processing of raw data...")
 
     input_files = listdir("data/raw/")
     input_files_filtered = filter_input_files(input_files)
     for filename in input_files_filtered:
         preprocessed_folder_path = "data/preprocessed/" + filename + "/"
-        if force_pre_processing_overwrite:
+        if not PREPROCESS_WITH_MISSING_RESIDUES:
+            preprocessed_folder_path = preprocessed_folder_path[:-1] + "_no_missing/"
+        if FORCE_PREPROCESSING_OVERWRITE:
             rmtree(preprocessed_folder_path)
         if not exists(preprocessed_folder_path):
             makedirs(preprocessed_folder_path)
-            process_file(filename, preprocessed_folder_path)
+            if filename[:5] == "valid" or filename[:4] == "test":
+                # Careful while saving tertiary info for proteins with missing residues
+                process_file(filename, preprocessed_folder_path, True)
+            else:
+                process_file(filename, preprocessed_folder_path, False)
         else:
             print(
                 "Preprocessed files already present in",
                 preprocessed_folder_path,
-                "directory. Use --force-pre-processing-overwrite",
-                "or delete the folder manually to overwrite",
-            )
-        if not exists(preprocessed_folder_path[:-1] + "_no_missing/"):
-            makedirs(preprocessed_folder_path[:-1] + "_no_missing/")
-            process_file_no_missing(
-                filename, preprocessed_folder_path[:-1] + "_no_missing/"
-            )
-        else:
-            print(
-                "Preprocessed files already present in",
-                preprocessed_folder_path[:-1] + "_no_missing/",
                 "directory. Use --force-pre-processing-overwrite",
                 "or delete the folder manually to overwrite",
             )
