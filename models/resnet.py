@@ -12,7 +12,7 @@ class ResNet(nn.Module):
 
         self.reslay = resnet34()
         self.fc1 = nn.Linear(512, 64)
-        self.fc2 = nn.Linear(64, 4)
+        self.fc2 = nn.Linear(64, 6)
 
     def generate_input(self, lengths, primary, evolutionary):
         """
@@ -48,15 +48,16 @@ class ResNet(nn.Module):
         # output                        [n, 41, L]
         return torch.cat((transformed_primary, transformed_evolutionary), dim=1)
 
-    def generate_target(self, lengths, phi, psi):
-        target = torch.zeros(MINIBATCH_SIZE, 4, lengths[0], device=self.device)
+    def generate_target(self, lengths, dihedrals):
+        # features is a list of numpy arrays that contain the target items
+        target = torch.zeros(
+            MINIBATCH_SIZE, len(dihedrals) * 2, lengths[0], device=self.device
+        )
         for i in range(MINIBATCH_SIZE):
-            phi_torch = torch.from_numpy(phi[i])
-            psi_torch = torch.from_numpy(psi[i])
-            target[i, 0, : lengths[i]] = torch.sin(phi_torch)
-            target[i, 1, : lengths[i]] = torch.cos(phi_torch)
-            target[i, 2, : lengths[i]] = torch.sin(psi_torch)
-            target[i, 3, : lengths[i]] = torch.cos(psi_torch)
+            for j, angles in enumerate(dihedrals):
+                angles = torch.from_numpy(angles).to(self.device)
+                target[i, j * 2, : lengths[i]] = torch.sin(angles)
+                target[i, j * 2 + 1, : lengths[i]] = torch.cos(angles)
         return target
 
     def calculate_loss(self, lengths, criterion, output, target):

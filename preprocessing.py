@@ -343,7 +343,7 @@ def filter_input_files(input_files):
     return list(filter(lambda x: not x.endswith(disallowed_file_endings), input_files))
 
 
-def process_raw_data():
+def preprocess_raw_data():
     print("Starting pre-processing of raw data...")
 
     input_files = listdir("data/raw/")

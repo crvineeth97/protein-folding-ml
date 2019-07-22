@@ -6,9 +6,9 @@ from torch.utils.data import DataLoader, Dataset
 from constants import MINIBATCH_SIZE
 
 
-def contruct_dataloader_from_disk(foldername, device):
+def contruct_dataloader_from_disk(foldername):
     return DataLoader(
-        ProteinNetDataset(foldername, device),
+        ProteinNetDataset(foldername),
         batch_size=MINIBATCH_SIZE,
         shuffle=True,
         collate_fn=merge_samples_to_minibatch,
@@ -17,26 +17,33 @@ def contruct_dataloader_from_disk(foldername, device):
 
 
 class ProteinNetDataset(Dataset):
-    def __init__(self, foldername, device):
+    def __init__(self, foldername):
         super(ProteinNetDataset, self).__init__()
         self.foldername = foldername
         self.filenames = listdir(foldername)
-        self.device = device
 
     def __getitem__(self, index):
         protein = load(self.foldername + self.filenames[index])
-        primary = protein["primary"]
-        # primary = torch.tensor(
-        #     protein["primary"], dtype=torch.uint8, device=self.device
-        # )
-        # evolutionary = torch.tensor(
-        #     protein["evolutionary"], dtype=torch.float, device=self.device
-        # )
-        # secondary = torch.tensor(protein["secondary"], dtype=torch.uint8, device=self.device)
-        # phi = torch.tensor(protein["phi"], dtype=torch.float, device=self.device)
-        # psi = torch.tensor(protein["psi"], dtype=torch.float, device=self.device)
-        length = primary.shape[0]
-        return length, primary, protein["evolutionary"], protein["phi"], protein["psi"]
+        length = protein["primary"].shape[0]
+        if self.foldername[:5] == "valid" or self.foldername[:4] == "test":
+            return (
+                length,
+                protein["primary"],
+                protein["evolutionary"],
+                protein["phi"],
+                protein["psi"],
+                protein["omega"],
+                protein["tertiary"],
+            )
+        else:
+            return (
+                length,
+                protein["primary"],
+                protein["evolutionary"],
+                protein["phi"],
+                protein["psi"],
+                protein["omega"],
+            )
 
     def __len__(self):
         return len(self.filenames)

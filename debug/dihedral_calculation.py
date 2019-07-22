@@ -142,6 +142,7 @@ primary, tertiary = get_backbone_coords("2YO0")
 phi = calculate_phi_from_masked_tertiary(tertiary)
 psi = calculate_psi_from_masked_tertiary(tertiary)
 omega = calculate_omega_from_masked_tertiary(tertiary)
+
 # print(primary)
 # print(phi)
 # print()
@@ -150,25 +151,25 @@ omega = calculate_omega_from_masked_tertiary(tertiary)
 # print(omega)
 # print()
 
-dihedrals = from_numpy(
-    np.reshape(np.array(list(zip(phi, psi, omega)), dtype=np.float32), (-1, 1, 3))
-)
-print(dihedrals.shape)
-points = dihedral_to_point(dihedrals, device("cpu"))
-coordinates = (
-    point_to_coordinate(points, device("cpu")) / 100
-)  # devide by 100 to angstrom unit
-coords = coordinates.transpose(0, 1).contiguous().view(1, -1, 9).transpose(0, 1)
-
-actual_coords = (
-    from_numpy(tertiary).unsqueeze(1).transpose(0, 1).contiguous().view(-1, 3).detach()
-)
-predicted_coords = coords.transpose(0, 1).contiguous().view(-1, 3).detach()
-rmsd = calc_rmsd(predicted_coords, actual_coords)
-drmsd = calc_drmsd(predicted_coords, actual_coords)
-
+# dihedrals = from_numpy(
+#     np.reshape(np.array(list(zip(phi, psi, omega)), dtype=np.float32), (-1, 1, 3))
+# )
+# print(dihedrals.shape)
+# points = dihedral_to_point(dihedrals, device("cpu"))
 # print(points)
-# structure = PeptideBuilder.make_structure(primary, phi[1:], psi[1:], omega[1:])
-# out = PDBIO()
-# out.set_structure(structure)
-# out.save("test.pdb")
+# coordinates = (
+#     point_to_coordinate(points, device("cpu")) / 100
+# )  # devide by 100 to angstrom unit
+# coords = coordinates.transpose(0, 1).contiguous().view(1, -1, 9).transpose(0, 1)
+
+# actual_coords = (
+#     from_numpy(tertiary).unsqueeze(1).transpose(0, 1).contiguous().view(-1, 3).detach()
+# )
+# predicted_coords = coords.transpose(0, 1).contiguous().view(-1, 3).detach()
+# rmsd = calc_rmsd(predicted_coords, actual_coords)
+# drmsd = calc_drmsd(predicted_coords, actual_coords)
+
+structure = PeptideBuilder.make_structure(primary, phi[1:], psi[1:], omega[1:])
+out = PDBIO()
+out.set_structure(structure)
+out.save("test.pdb")
