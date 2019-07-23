@@ -356,7 +356,7 @@ def preprocess_raw_data():
             rmtree(preprocessed_folder_path)
         if not exists(preprocessed_folder_path):
             makedirs(preprocessed_folder_path)
-            if filename[:5] == "valid" or filename[:4] == "test":
+            if "valid" in filename or "test" in filename:
                 # Careful while saving tertiary info for proteins with missing residues
                 process_file(filename, preprocessed_folder_path, True)
             else:

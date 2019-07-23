@@ -1,46 +1,58 @@
 import numpy as np
-from constants import EVAL_INTERVAL, LEARNING_RATE, MIN_UPDATES
-from dataloader import contruct_dataloader_from_disk
-from visualization import visualize
 import torch
+import requests
+
+import pnerf.pnerf as pnerf
+from constants import (
+    EVAL_INTERVAL,
+    LEARNING_RATE,
+    MIN_BATCH_ITER,
+    MINIBATCH_SIZE,
+    TRAINING_FOLDER,
+    VALIDATION_FOLDER,
+    HIDE_UI,
+    DEVICE,
+)
+from dataloader import contruct_dataloader_from_disk
 from util import (
-    calculate_dihedral_angles,
-    evaluate_model,
-    get_structure_from_angles,
+    calc_rmsd,
+    calc_drmsd,
     set_experiment_id,
+    write_to_pdb,
     write_model_to_disk,
     write_out,
     write_result_summary,
-    write_to_pdb,
 )
-import pnerf.pnerf as pnerf
-
-TRAINING_FOLDER = "data/preprocessed/training_30_no_missing/"
-VALIDATION_FOLDER = "data/preprocessed/validation_no_missing/"
 
 
-def validate_model(model, train_loss, device):
+def validate_model(model):
     validation_loader = contruct_dataloader_from_disk(VALIDATION_FOLDER)
-    loss = 0
-    dRMSD_list = []
-    RMSD_list = []
+    val_size = validation_loader.dataset.__len__()
+    rmsd = 0
+    drmsd = 0
     for i, data in enumerate(validation_loader):
         lengths, primary, evolutionary, phi, psi, omega, tertiary = data
         inp = model.generate_input(lengths, primary, evolutionary)
         output = model(inp)
-        phi = np.arctan2(output[:, 0, :], output[:, 1, :])
-        psi = np.arctan2(output[:, 2, :], output[:, 3, :])
-        omega = np.arctan2(output[:, 4, :], output[:, 5, :])
-
-        dihedrals = torch.from_numpy(
-            np.reshape(
-                np.array(list(zip(phi, psi, omega)), dtype=np.float32), (-1, 1, 3)
-            )
-        )
-        points = pnerf.dihedral_to_point(dihedrals, device)
+        # The following will be of size [Batch, Length]
+        phi = torch.atan2(output[:, 0, :], output[:, 1, :]).unsqueeze(1)
+        psi = torch.atan2(output[:, 2, :], output[:, 3, :]).unsqueeze(1)
+        omega = torch.atan2(output[:, 4, :], output[:, 5, :]).unsqueeze(1)
+        # dihedrals will be of size [Length, Batch, 3] as this is the input
+        # required by pnerf functions
+        dihedrals = torch.cat((phi, psi, omega), 1).transpose(1, 2).transpose(0, 1)
+        # Pnerf takes dihedrals and optional bond lengths and bond angles as input
+        # and builds the coordinates so that rmsd can be calculated for loss
+        # Divide by 100 to get in angstrom units
+        # Coordinates will be of size [Length * 3, Batch, 3]
+        # Last dimension represents the x, y, z coordinates
+        # And the Length * 3 represents N, C_a, C for each AA
         coordinates = (
-            pnerf.point_to_coordinate(points, device) / 100
-        )  # divide by 100 to get in angstrom units
+            pnerf.point_to_coordinate(
+                pnerf.dihedral_to_point(dihedrals, DEVICE), DEVICE
+            )
+            / 100
+        )
         coords = coordinates.transpose(0, 1).contiguous().view(1, -1, 9).transpose(0, 1)
         predicted_coords = coords.transpose(0, 1).contiguous().view(-1, 3)
         actual_coords = (
@@ -50,66 +62,14 @@ def validate_model(model, train_loss, device):
             .contiguous()
             .view(-1, 3)
         )
-        rmsd = calc_rmsd(predicted_coords, actual_coords)
-        drmsd = calc_drmsd(predicted_coords, actual_coords)
-
-        write_out("Apply model to validation minibatch:", time.time() - start)
-        cpu_predicted_angles = predicted_angles.transpose(0, 1).cpu().detach()
-        cpu_predicted_backbone_atoms = backbone_atoms.transpose(0, 1).cpu().detach()
-        minibatch_data = list(
-            zip(primary, tertiary, cpu_predicted_angles, cpu_predicted_backbone_atoms)
-        )
-        data_total.extend(minibatch_data)
-        start = time.time()
-        for (
-            primary_sequence,
-            tertiary_positions,
-            predicted_pos,
-            predicted_backbone_atoms,
-        ) in minibatch_data:
-            actual_coords = tertiary_positions.transpose(0, 1).contiguous().view(-1, 3)
-            predicted_coords = (
-                predicted_backbone_atoms[: len(primary_sequence)]
-                .transpose(0, 1)
-                .contiguous()
-                .view(-1, 3)
-                .detach()
-            )
-            rmsd = calc_rmsd(predicted_coords, actual_coords)
-            drmsd = calc_drmsd(predicted_coords, actual_coords)
-            RMSD_list.append(rmsd)
-            dRMSD_list.append(drmsd)
-            error = rmsd
-            loss += error
-            end = time.time()
-        write_out("Calculate validation loss for minibatch took:", end - start)
-    loss /= data_loader.dataset.__len__()
-
-    write_to_pdb(get_structure_from_angles(prim, angles), "test")
-    write_to_pdb(get_structure_from_angles(prim, angles_pred), "test_pred")
-    if validation_loss < best_model_loss:
-        best_model_loss = validation_loss
-        best_model_minibatch_time = minibatches_proccesed
-        best_model_path = write_model_to_disk(model)
-
-    write_out("Validation loss:", validation_loss, "Train loss:", train_loss)
-    write_out(
-        "Best model so far (validation loss): ",
-        validation_loss,
-        "at time",
-        best_model_minibatch_time,
-    )
-    write_out("Best model stored at " + best_model_path)
-    write_out("Minibatches processed:", minibatches_proccesed)
-    sample_num.append(minibatches_proccesed)
-    train_loss_values.append(train_loss)
-    validation_loss_values.append(validation_loss)
-    rmsd_avg_values.append(rmsd_avg)
-    drmsd_avg_values.append(drmsd_avg)
-    visualize()
+        rmsd += calc_rmsd(predicted_coords, actual_coords)
+        drmsd += calc_drmsd(predicted_coords, actual_coords)
+    rmsd /= val_size
+    drmsd /= val_size
+    return val_size, rmsd, drmsd
 
 
-def train_model(model, device):
+def train_model(model):
     set_experiment_id("TRAIN")
 
     train_loader = contruct_dataloader_from_disk(TRAINING_FOLDER)
@@ -122,19 +82,29 @@ def train_model(model, device):
     stopping_condition_met = False
     minibatches_proccesed = 0
 
+    train_loss_values = []
+    validation_loss_values = []
+    rmsd_avg_values = []
+    drmsd_avg_values = []
+
     while not stopping_condition_met:
         optimizer.zero_grad()
         model.zero_grad()
-        loss_tracker = np.zeros(0)
         for minibatch_id, training_minibatch in enumerate(train_loader):
-            minibatches_proccesed += 1
             # training_minibatch is a tuple of tuple of tensors except
             # lengths, which is a tuple of ints
-            lengths, primary, evolutionary, phi, psi, omega = training_minibatch
+            # Implies primary will be a tuple with MINIBATCH_SIZE number of elements
+            # And each element will be of shape (Length,)
+            # phi, psi and omega are in degrees here
+            lengths, primary, evolutionary, actual_phi, actual_psi, actual_omega = (
+                training_minibatch
+            )
             # inp should be of shape [Batch, 41, Max_length]
-            inp = model.generate_input(lengths, primary, evolutionary)  # .cuda()
+            inp = model.generate_input(lengths, primary, evolutionary)
             # target should be of shape [Batch, 6, Max_length]
-            target = model.generate_target(lengths, [phi, psi, omega])
+            target = model.generate_target(
+                lengths, np.array([actual_phi, actual_psi, actual_omega])
+            )
             # output should be of shape [Batch, 6, Max_length]
             # sin(phi), cos(phi), sin(psi), cos(psi), sin(omega), cos(omega)
             output = model(inp)
@@ -142,16 +112,44 @@ def train_model(model, device):
             optimizer.zero_grad()
             write_out("Train loss:", loss.item())
             loss.backward()
-            loss_tracker = np.append(loss_tracker, loss.item())
             optimizer.step()
 
             if minibatches_proccesed % EVAL_INTERVAL == 0:
-                validate_model(model, loss_tracker.mean())
-                loss_tracker = np.zeros(0)
+                val_size, rmsd, drmsd = validate_model(model)
+                if rmsd < best_model_loss:
+                    best_model_loss = rmsd
+                    best_model_path = write_model_to_disk(model)
+                write_out("Validation loss: ", rmsd, "Train loss: ", loss.item())
+                write_out("Best model stored at " + best_model_path)
+                train_loss_values.append(loss)
+                validation_loss_values.append(rmsd)
+                rmsd_avg_values.append(rmsd)
+                drmsd_avg_values.append(drmsd)
+                if not HIDE_UI:
+                    data = {}
+                    data["pdb_data_pred"] = open("output/pred_test.pdb", "r").read()
+                    data["pdb_data_true"] = open("output/actual_test.pdb", "r").read()
+                    data["validation_dataset_size"] = val_size
+                    # data["sample_num"] = sample_num
+                    data["train_loss_values"] = train_loss_values
+                    data["validation_loss_values"] = validation_loss_values
+                    data["phi_actual"] = list(actual_phi)
+                    data["psi_actual"] = list(actual_psi)
+                    pred_phi = np.arctan2(output[:, 0, :], output[:, 1, :])
+                    pred_psi = np.arctan2(output[:, 2, :], output[:, 3, :])
+                    # pred_omega = np.arctan2(output[:, 4, :], output[:, 5, :])
+                    data["phi_predicted"] = list(pred_phi * 180.0 / np.pi)
+                    data["psi_predicted"] = list(pred_psi * 180.0 / np.pi)
+                    data["drmsd_avg"] = drmsd_avg_values
+                    data["rmsd_avg"] = rmsd_avg_values
+                    res = requests.post("http://localhost:5000/graph", json=data)
+                    if res.ok:
+                        print(res.json())
 
-            if minibatches_proccesed > MIN_UPDATES:
+            if minibatches_proccesed > MIN_BATCH_ITER:
                 stopping_condition_met = True
                 break
+            minibatches_proccesed += 1
 
     write_result_summary(best_model_loss)
     return best_model_path

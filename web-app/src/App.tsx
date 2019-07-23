@@ -59,11 +59,6 @@ class App extends React.Component<IAppProb, IAppProb> {
                         <div style={{ gridColumn: 1, color: "white", textAlign: "left", marginLeft: "20px" }}>
                             <h1 className="App-title">OpenProtein</h1>
                         </div>
-                        <div style={{ gridColumn: 2, color: "white", textAlign: "right" }}>
-                            <div style={{ margin: "20px", color: "white", fontSize: "10pt" }}>
-                                <a style={{ color: "white", textDecoration: "none" }} href="https://github.com/openprotein">View OpenProtein on Github</a>
-                            </div>
-                        </div>
                     </div>
                     <div style={mainPanelStyle}><Visualizer pdbData={this.state.pdbData} /></div>
                     <div style={leftPanelStyle}><Metrics setPdbData={this.setPdbData} /></div>
@@ -76,11 +71,6 @@ class App extends React.Component<IAppProb, IAppProb> {
                                 Actual
                       </div>
                         </div>
-                        <div style={{ gridColumn: 2, color: "white", textAlign: "right" }}>
-                            <div style={{ margin: "20px", color: "lightgrey", fontSize: "10pt" }}>
-                                © 2019 OpenProtein, all rights reserved
-                      </div>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -88,7 +78,7 @@ class App extends React.Component<IAppProb, IAppProb> {
     }
 
     public componentDidMount() {
-        document.title = "OpenProtein"
+        document.title = "Protein Prediction"
     }
 
 }

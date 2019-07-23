@@ -24,7 +24,7 @@ def dihedral_to_point(
     dihedral, device, bond_lengths=BOND_LENGTHS, bond_angles=BOND_ANGLES
 ):
     """
-    Takes triplets of dihedral angles (phi, psi, omega) and returns 3D points
+    Takes triplets of dihedral angles (phi, psi, omega) in radians and returns 3D points
     ready for use in reconstruction of coordinates. Bond lengths and angles
     are based on idealized averages.
     :param dihedral: [NUM_STEPS, BATCH_SIZE, NUM_DIHEDRALS]

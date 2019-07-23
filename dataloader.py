@@ -25,7 +25,7 @@ class ProteinNetDataset(Dataset):
     def __getitem__(self, index):
         protein = load(self.foldername + self.filenames[index])
         length = protein["primary"].shape[0]
-        if self.foldername[:5] == "valid" or self.foldername[:4] == "test":
+        if "valid" in self.foldername or "test" in self.foldername:
             return (
                 length,
                 protein["primary"],

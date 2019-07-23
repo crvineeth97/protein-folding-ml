@@ -1,3 +1,6 @@
+from torch import device
+from torch.cuda import is_available
+
 # Size of a minibatch during training
 MINIBATCH_SIZE = 1
 
@@ -5,7 +8,7 @@ MINIBATCH_SIZE = 1
 LEARNING_RATE = 0.01
 
 # Minimum number of minibatch iterations
-MIN_UPDATES = 5000
+MIN_BATCH_ITER = 5000
 
 # Evaluate model on validation set every n minibatches
 EVAL_INTERVAL = 5
@@ -49,3 +52,18 @@ HIDE_UI = True
 
 # If set to True, preprocess proteins that have missing residues in the middle
 PREPROCESS_WITH_MISSING_RESIDUES = False
+
+# Folder containing training data
+TRAINING_FOLDER = "data/preprocessed/training_30_no_missing/"
+
+# Folder containing validation data
+VALIDATION_FOLDER = "data/preprocessed/validation_no_missing/"
+
+# Folder containing testing data
+TESTING_FOLDER = "data/preprocessed/testing_no_missing/"
+
+# Which device to use for tensor computations
+DEVICE = device("cpu")
+if is_available():
+    print("CUDA is available, using GPU")
+    DEVICE = device("cuda")

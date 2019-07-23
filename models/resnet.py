@@ -2,14 +2,13 @@ import torch
 import torch.nn as nn
 
 from models.resnet_1d import resnet34
-from constants import MINIBATCH_SIZE
+from numpy import pi
+from constants import MINIBATCH_SIZE, DEVICE
 
 
 class ResNet(nn.Module):
-    def __init__(self, device):
+    def __init__(self):
         super(ResNet, self).__init__()
-        self.device = device
-
         self.reslay = resnet34()
         self.fc1 = nn.Linear(512, 64)
         self.fc2 = nn.Linear(64, 6)
@@ -26,9 +25,7 @@ class ResNet(nn.Module):
         the PSSM matrix of the protein
         """
 
-        transformed_primary = torch.zeros(
-            MINIBATCH_SIZE, 20, lengths[0], device=self.device
-        )
+        transformed_primary = torch.zeros(MINIBATCH_SIZE, 20, lengths[0], device=DEVICE)
 
         for i in range(MINIBATCH_SIZE):
             for j in range(lengths[i]):
@@ -36,7 +33,7 @@ class ResNet(nn.Module):
                 transformed_primary[i][residue][j] = 1.0
 
         transformed_evolutionary = torch.zeros(
-            MINIBATCH_SIZE, 21, lengths[0], device=self.device
+            MINIBATCH_SIZE, 21, lengths[0], device=DEVICE
         )
         for i in range(MINIBATCH_SIZE):
             transformed_evolutionary[i, :, : lengths[i]] = torch.transpose(
@@ -49,13 +46,13 @@ class ResNet(nn.Module):
         return torch.cat((transformed_primary, transformed_evolutionary), dim=1)
 
     def generate_target(self, lengths, dihedrals):
-        # features is a list of numpy arrays that contain the target items
+        # dihedrals are in degrees
         target = torch.zeros(
-            MINIBATCH_SIZE, len(dihedrals) * 2, lengths[0], device=self.device
+            MINIBATCH_SIZE, len(dihedrals) * 2, lengths[0], device=DEVICE
         )
         for i in range(MINIBATCH_SIZE):
             for j, angles in enumerate(dihedrals):
-                angles = torch.from_numpy(angles).to(self.device)
+                angles = torch.from_numpy(angles * pi / 180.0).to(DEVICE)
                 target[i, j * 2, : lengths[i]] = torch.sin(angles)
                 target[i, j * 2 + 1, : lengths[i]] = torch.cos(angles)
         return target

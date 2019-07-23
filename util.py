@@ -1,6 +1,4 @@
 import math
-import time
-import warnings
 from datetime import datetime
 
 import numpy as np
@@ -8,10 +6,7 @@ import torch
 from Bio.PDB import PDBIO
 from PeptideBuilder import make_structure
 
-import pnerf.pnerf as pnerf
-from constants import AA_ID_DICT, LEARNING_RATE, MINIBATCH_SIZE
-
-warnings.filterwarnings("error")
+from constants import LEARNING_RATE, MINIBATCH_SIZE
 
 
 def set_experiment_id(data_set_identifier):
@@ -42,6 +37,14 @@ def write_model_to_disk(model):
     path = "output/models/" + globals().get("experiment_id") + ".model"
     torch.save(model, path)
     return path
+
+
+def write_to_pdb(primary, dihedrals, name):
+    phi, psi, omega = dihedrals
+    structure = make_structure(primary, phi[1:], psi[1:], omega[1:])
+    out = PDBIO()
+    out.set_structure(structure)
+    out.save(name + ".pdb")
 
 
 def draw_plot(
@@ -100,81 +103,6 @@ def write_result_summary(accuracy):
     print(output_string, end="")
 
 
-def calculate_dihedral_angles_over_minibatch(atomic_coords_padded, batch_sizes, device):
-    angles = []
-    atomic_coords = atomic_coords_padded.transpose(0, 1)
-    for idx, _ in enumerate(batch_sizes):
-        angles.append(
-            calculate_dihedral_angles(atomic_coords[idx][: batch_sizes[idx]], device)
-        )
-    return torch.nn.utils.rnn.pad_packed_sequence(
-        torch.nn.utils.rnn.pack_sequence(angles)
-    )
-
-
-def protein_id_to_str(protein_id_list):
-    _aa_dict_inverse = {v: k for k, v in AA_ID_DICT.items()}
-    aa_list = []
-    for a in protein_id_list:
-        aa_symbol = _aa_dict_inverse[int(a)]
-        aa_list.append(aa_symbol)
-    return aa_list
-
-
-def calculate_dihedral_angles(atomic_coords, device):
-
-    assert int(atomic_coords.shape[1]) == 9
-    atomic_coords = atomic_coords.contiguous().view(-1, 3)
-
-    zero_tensor = torch.tensor(0.0, device=device)
-
-    dihedral_list = [zero_tensor, zero_tensor]
-    dihedral_list.extend(compute_dihedral_list(atomic_coords))
-    dihedral_list.append(zero_tensor)
-    angles = torch.tensor(dihedral_list).view(-1, 3)
-    return angles
-
-
-def compute_dihedral_list(atomic_coords):
-    # atomic_coords is -1 x 3
-    ba = atomic_coords[1:] - atomic_coords[:-1]
-    ba /= ba.norm(dim=1).unsqueeze(1)
-    ba_neg = -1 * ba
-
-    n1_vec = torch.cross(ba[:-2], ba_neg[1:-1], dim=1)
-    n2_vec = torch.cross(ba_neg[1:-1], ba[2:], dim=1)
-    n1_vec /= n1_vec.norm(dim=1).unsqueeze(1)
-    n2_vec /= n2_vec.norm(dim=1).unsqueeze(1)
-
-    m1_vec = torch.cross(n1_vec, ba_neg[1:-1], dim=1)
-
-    x = torch.sum(n1_vec * n2_vec, dim=1)
-    y = torch.sum(m1_vec * n2_vec, dim=1)
-
-    return torch.atan2(y, x)
-
-
-def get_structure_from_angles(aa_list_encoded, angles):
-    aa_list = protein_id_to_str(aa_list_encoded)
-    omega_list = angles[1:, 0]
-    phi_list = angles[1:, 1]
-    psi_list = angles[:-1, 2]
-    assert len(aa_list) == len(phi_list) + 1 == len(psi_list) + 1 == len(omega_list) + 1
-    structure = make_structure(
-        aa_list,
-        list(map(lambda x: math.degrees(x), phi_list)),
-        list(map(lambda x: math.degrees(x), psi_list)),
-        list(map(lambda x: math.degrees(x), omega_list)),
-    )
-    return structure
-
-
-def write_to_pdb(structure, prot_id):
-    out = PDBIO()
-    out.set_structure(structure)
-    out.save("output/protein_" + str(prot_id) + ".pdb")
-
-
 def calc_pairwise_distances(chain_a, chain_b, device):
     distance_matrix = torch.Tensor(
         chain_a.size()[0], chain_b.size()[0], device=device
@@ -189,18 +117,7 @@ def calc_pairwise_distances(chain_a, chain_b, device):
     return torch.sqrt(distance_matrix + epsilon)
 
 
-def calc_drmsd(chain_a, chain_b, device=torch.device("cpu")):
-    assert len(chain_a) == len(chain_b)
-    distance_matrix_a = calc_pairwise_distances(chain_a, chain_a, device)
-    distance_matrix_b = calc_pairwise_distances(chain_b, chain_b, device)
-    return torch.norm(distance_matrix_a - distance_matrix_b, 2) / math.sqrt(
-        (len(chain_a) * (len(chain_a) - 1))
-    )
-
-
 # method for translating a point cloud to its center of mass
-
-
 def transpose_atoms_to_center_of_mass(x):
     # calculate com by summing x, y and z respectively
     # and dividing by the number of points
@@ -235,6 +152,15 @@ def calc_rmsd(chain_a, chain_b):
     return RMSD
 
 
+def calc_drmsd(chain_a, chain_b, device=torch.device("cpu")):
+    assert len(chain_a) == len(chain_b)
+    distance_matrix_a = calc_pairwise_distances(chain_a, chain_a, device)
+    distance_matrix_b = calc_pairwise_distances(chain_b, chain_b, device)
+    return torch.norm(distance_matrix_a - distance_matrix_b, 2) / math.sqrt(
+        (len(chain_a) * (len(chain_a) - 1))
+    )
+
+
 def calc_angular_difference(a1, a2):
     a1 = a1.transpose(0, 1).contiguous()
     a2 = a2.transpose(0, 1).contiguous()
@@ -256,16 +182,6 @@ def calc_angular_difference(a1, a2):
     return sum / a1.shape[0]
 
 
-def structures_to_backbone_atoms_padded(structures):
-    backbone_atoms_list = []
-    for structure in structures:
-        backbone_atoms_list.append(structure_to_backbone_atoms(structure))
-    backbone_atoms_padded, batch_sizes_backbone = torch.nn.utils.rnn.pad_packed_sequence(
-        torch.nn.utils.rnn.pack_sequence(backbone_atoms_list)
-    )
-    return backbone_atoms_padded, batch_sizes_backbone
-
-
 def structure_to_backbone_atoms(structure):
     predicted_coords = []
     for res in structure.get_residues():
@@ -273,20 +189,6 @@ def structure_to_backbone_atoms(structure):
         predicted_coords.append(torch.Tensor(res["CA"].get_coord()))
         predicted_coords.append(torch.Tensor(res["C"].get_coord()))
     return torch.stack(predicted_coords).view(-1, 9)
-
-
-def get_backbone_positions_from_angular_prediction(dihedrals, batch_sizes, device):
-    points = pnerf.dihedral_to_point(dihedrals, device)
-    coordinates = (
-        pnerf.point_to_coordinate(points, device) / 100
-    )  # devide by 100 to angstrom unit
-    return (
-        coordinates.transpose(0, 1)
-        .contiguous()
-        .view(len(batch_sizes), -1, 9)
-        .transpose(0, 1),
-        batch_sizes,
-    )
 
 
 def calc_avg_drmsd_over_minibatch(
@@ -311,51 +213,3 @@ def calc_avg_drmsd_over_minibatch(
             backbone_atoms.transpose(0, 1).contiguous().view(-1, 3), actual_coords
         )
     return drmsd_avg / len(backbone_atoms_list)
-
-
-def intial_pos_from_aa_string(batch_aa_string):
-    structures = []
-    for aa_string in batch_aa_string:
-        structure = get_structure_from_angles(
-            aa_string,
-            np.repeat([-120], len(aa_string) - 1),
-            np.repeat([140], len(aa_string) - 1),
-            np.repeat([-370], len(aa_string) - 1),
-        )
-        structures.append(structure)
-    return structures
-
-
-def pass_messages(aa_features, message_transformation, device):
-    # aa_features (#aa, #features) - each row represents the amino acid type
-    # (embedding) and the positions of the backbone atoms
-    # message_transformation: (-1 * 2 * feature_size) ->
-    #                           (-1 * output message size)
-    feature_size = aa_features.size(1)
-    aa_count = aa_features.size(0)
-    eye = (
-        torch.eye(aa_count, dtype=torch.uint8)
-        .view(-1)
-        .expand(2, feature_size, -1)
-        .transpose(1, 2)
-        .transpose(0, 1)
-        .device(device)
-    )
-    eye_inverted = torch.ones(eye.size(), dtype=torch.uint8, device=device) - eye
-    features_repeated = aa_features.repeat((aa_count, 1)).view(
-        (aa_count, aa_count, feature_size)
-    )
-    aa_messages = (
-        torch.stack((features_repeated.transpose(0, 1), features_repeated))
-        .transpose(0, 1)
-        .transpose(1, 2)
-        .view(-1, 2, feature_size)
-    )
-    # (aa_count^2 - aa_count) x 2 x aa_features
-    # (all pairs except for reflexive connections)
-    aa_msg_pairs = torch.masked_select(aa_messages, eye_inverted).view(
-        -1, 2, feature_size
-    )
-    transformed = message_transformation(aa_msg_pairs).view(aa_count, aa_count - 1, -1)
-    transformed_sum = transformed.sum(dim=1)  # aa_count x output message size
-    return transformed_sum
