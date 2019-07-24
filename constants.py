@@ -2,6 +2,10 @@ from torch import device
 from torch.cuda import is_available
 
 # Size of a minibatch during training
+# Using a size greater than 1 might not be the best idea
+# The padded 0s of the proteins that aren't of maximum length
+# won't be 0 in the output. Can manually make it 0 before back
+# prop, but not sure how effective it will be
 MINIBATCH_SIZE = 1
 
 # Learning rate of the implemented model during training
@@ -11,7 +15,7 @@ LEARNING_RATE = 0.01
 MIN_BATCH_ITER = 5000
 
 # Evaluate model on validation set every n minibatches
-EVAL_INTERVAL = 5
+EVAL_INTERVAL = 50
 
 # List of amino acids and their integer representation
 AA_ID_DICT = {

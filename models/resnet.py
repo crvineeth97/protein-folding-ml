@@ -25,7 +25,9 @@ class ResNet(nn.Module):
         the PSSM matrix of the protein
         """
 
-        transformed_primary = torch.zeros(MINIBATCH_SIZE, 20, lengths[0], device=DEVICE)
+        transformed_primary = torch.zeros(
+            MINIBATCH_SIZE, 20, lengths[0], device=DEVICE, dtype=torch.float32
+        )
 
         for i in range(MINIBATCH_SIZE):
             for j in range(lengths[i]):
@@ -33,7 +35,7 @@ class ResNet(nn.Module):
                 transformed_primary[i][residue][j] = 1.0
 
         transformed_evolutionary = torch.zeros(
-            MINIBATCH_SIZE, 21, lengths[0], device=DEVICE
+            MINIBATCH_SIZE, 21, lengths[0], device=DEVICE, dtype=torch.float32
         )
         for i in range(MINIBATCH_SIZE):
             transformed_evolutionary[i, :, : lengths[i]] = torch.transpose(
@@ -47,7 +49,9 @@ class ResNet(nn.Module):
 
     def generate_target(self, lengths, phi, psi, omega):
         # dihedrals are in degrees
-        target = torch.zeros(MINIBATCH_SIZE, 6, lengths[0], device=DEVICE)
+        target = torch.zeros(
+            MINIBATCH_SIZE, 6, lengths[0], device=DEVICE, dtype=torch.float32
+        )
         for i in range(MINIBATCH_SIZE):
             ph = torch.from_numpy(phi[i] * pi / 180.0)
             ps = torch.from_numpy(psi[i] * pi / 180.0)
@@ -55,9 +59,9 @@ class ResNet(nn.Module):
             target[i, 0, : lengths[i]] = torch.sin(ph)
             target[i, 1, : lengths[i]] = torch.cos(ph)
             target[i, 2, : lengths[i]] = torch.sin(ps)
-            target[i, 3, : lengths[i]] = torch.sin(ps)
+            target[i, 3, : lengths[i]] = torch.cos(ps)
             target[i, 4, : lengths[i]] = torch.sin(om)
-            target[i, 5, : lengths[i]] = torch.sin(om)
+            target[i, 5, : lengths[i]] = torch.cos(om)
         return target
 
     def calculate_loss(self, lengths, criterion, output, target):

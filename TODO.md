@@ -2,6 +2,7 @@
 
 - [ ] Fix resnet_2d.py
 - [ ] Fix validation part of the train function in main
+- [ ] Fix calculation of RMSD and DRMSD
 - [ ] Add multiple GPU support
 - [ ] Improve the write_out function so that it is efficient
 - [ ] Optimize input, output and target generation in Resnet

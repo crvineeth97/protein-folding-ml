@@ -40,11 +40,12 @@ def write_model_to_disk(model):
 
 
 def write_to_pdb(primary, dihedrals, name):
+    # dihedrals are in degrees
     phi, psi, omega = dihedrals
     structure = make_structure(primary, phi[1:], psi[1:], omega[1:])
     out = PDBIO()
     out.set_structure(structure)
-    out.save(name + ".pdb")
+    out.save("output/" + name + ".pdb")
 
 
 def draw_plot(
@@ -121,7 +122,7 @@ def calc_pairwise_distances(chain_a, chain_b, device):
 def transpose_atoms_to_center_of_mass(x):
     # calculate com by summing x, y and z respectively
     # and dividing by the number of points
-    centerOfMass = np.matrix(
+    centerOfMass = np.array(
         [
             [x[0, :].sum() / x.shape[1]],
             [x[1, :].sum() / x.shape[1]],
@@ -139,10 +140,10 @@ def calc_rmsd(chain_a, chain_b):
     X = transpose_atoms_to_center_of_mass(a)
     Y = transpose_atoms_to_center_of_mass(b)
 
-    R = Y * X.transpose()
+    R = np.matmul(Y, X.transpose())
     # extract the singular values
     _, S, _ = np.linalg.svd(R)
-    # compute RMSD using the formular
+    # compute RMSD using the formula
     E0 = sum(
         list(np.linalg.norm(x) ** 2 for x in X.transpose())
         + list(np.linalg.norm(x) ** 2 for x in Y.transpose())

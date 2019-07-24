@@ -25,11 +25,22 @@ from util import (
 )
 
 
+def transform_tertiary(lengths, tertiary):
+    trans_tert = torch.zeros(
+        MINIBATCH_SIZE, lengths[0] * 3, 3, device=DEVICE, dtype=torch.float32
+    )
+    for i in range(MINIBATCH_SIZE):
+        for j in range(lengths[i]):
+            trans_tert[i, 3 * j + 0] = torch.from_numpy(tertiary[i][j, 0:3])
+            trans_tert[i, 3 * j + 1] = torch.from_numpy(tertiary[i][j, 3:6])
+            trans_tert[i, 3 * j + 2] = torch.from_numpy(tertiary[i][j, 6:9])
+    return trans_tert
+
+
 def validate_model(model):
     validation_loader = contruct_dataloader_from_disk(VALIDATION_FOLDER)
     val_size = validation_loader.dataset.__len__()
     rmsd = 0
-    drmsd = 0
     for i, data in enumerate(validation_loader):
         # Tertiary is [Batch, Length, 9]
         lengths, primary, evolutionary, act_phi, act_psi, act_omega, tertiary = data
@@ -60,12 +71,12 @@ def validate_model(model):
             / 100
         )
         predicted_coords = coordinates.transpose(0, 1).contiguous().view(-1, 3)
-        actual_coords = tertiary
+        actual_coords = transform_tertiary(lengths, tertiary).contiguous().view(-1, 3)
         rmsd += calc_rmsd(predicted_coords, actual_coords)
-        drmsd += calc_drmsd(predicted_coords, actual_coords)
+        # drmsd += calc_drmsd(predicted_coords, actual_coords)
     rmsd /= val_size
-    drmsd /= val_size
-    return val_size, rmsd, drmsd
+    # drmsd /= val_size
+    return val_size, rmsd
 
 
 def train_model(model):
@@ -84,12 +95,13 @@ def train_model(model):
     train_loss_values = []
     validation_loss_values = []
     rmsd_avg_values = []
-    drmsd_avg_values = []
+    # drmsd_avg_values = []
 
     while not stopping_condition_met:
         optimizer.zero_grad()
         model.zero_grad()
         for i, data in enumerate(train_loader):
+            minibatches_proccesed += 1
             # data is a tuple of tuple of tensors except
             # lengths, which is a tuple of ints
             # Implies primary will be a tuple with MINIBATCH_SIZE number of elements
@@ -110,17 +122,27 @@ def train_model(model):
             optimizer.step()
 
             if minibatches_proccesed % EVAL_INTERVAL == 0:
-                val_size, rmsd, drmsd = validate_model(model)
+                val_size, rmsd = validate_model(model)
                 if rmsd < best_model_loss:
                     best_model_loss = rmsd
                     best_model_path = write_model_to_disk(model)
                 write_out("Validation loss: ", rmsd, "Train loss: ", loss.item())
                 write_out("Best model stored at " + best_model_path)
-                train_loss_values.append(loss)
+                train_loss_values.append(loss.item())
                 validation_loss_values.append(rmsd)
                 rmsd_avg_values.append(rmsd)
-                drmsd_avg_values.append(drmsd)
+                # drmsd_avg_values.append(drmsd)
                 if not HIDE_UI:
+                    output = output.detach().numpy()[0]
+                    pred_phi = np.arctan2(output[0, :], output[1, :]) * 180.0 / np.pi
+                    pred_psi = np.arctan2(output[2, :], output[3, :]) * 180.0 / np.pi
+                    pred_omega = np.arctan2(output[4, :], output[5, :]) * 180.0 / np.pi
+                    write_to_pdb(
+                        primary[0], [act_phi[0], act_psi[0], act_omega[0]], "act_test"
+                    )
+                    write_to_pdb(
+                        primary[0], [pred_phi, pred_psi, pred_omega], "pred_test"
+                    )
                     data = {}
                     data["pdb_data_pred"] = open("output/pred_test.pdb", "r").read()
                     data["pdb_data_true"] = open("output/act_test.pdb", "r").read()
@@ -128,14 +150,12 @@ def train_model(model):
                     # data["sample_num"] = sample_num
                     data["train_loss_values"] = train_loss_values
                     data["validation_loss_values"] = validation_loss_values
-                    data["phi_actual"] = list(act_phi)
-                    data["psi_actual"] = list(act_psi)
-                    pred_phi = np.arctan2(output[:, 0, :], output[:, 1, :])
-                    pred_psi = np.arctan2(output[:, 2, :], output[:, 3, :])
+                    data["phi_actual"] = list(act_phi[0])
+                    data["psi_actual"] = list(act_psi[0])
                     # pred_omega = np.arctan2(output[:, 4, :], output[:, 5, :])
-                    data["phi_predicted"] = list(pred_phi * 180.0 / np.pi)
-                    data["psi_predicted"] = list(pred_psi * 180.0 / np.pi)
-                    data["drmsd_avg"] = drmsd_avg_values
+                    data["phi_predicted"] = list(pred_phi)
+                    data["psi_predicted"] = list(pred_psi)
+                    # data["drmsd_avg"] = drmsd_avg_values
                     data["rmsd_avg"] = rmsd_avg_values
                     res = requests.post("http://localhost:5000/graph", json=data)
                     if res.ok:
@@ -144,7 +164,6 @@ def train_model(model):
             if minibatches_proccesed > MIN_BATCH_ITER:
                 stopping_condition_met = True
                 break
-            minibatches_proccesed += 1
 
     write_result_summary(best_model_loss)
     return best_model_path
