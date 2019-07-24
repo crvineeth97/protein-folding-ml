@@ -1,6 +1,6 @@
 import numpy as np
 import torch
-import requests
+import matplotlib.pyplot as plt
 
 import pnerf.pnerf as pnerf
 from constants import (
@@ -16,13 +16,25 @@ from constants import (
 from dataloader import contruct_dataloader_from_disk
 from util import (
     calc_rmsd,
-    calc_drmsd,
     set_experiment_id,
-    write_to_pdb,
     write_model_to_disk,
     write_out,
     write_result_summary,
 )
+
+
+def init_plot():
+    plt.ion()
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    plt.title("Ramachandran plot")
+    ticks = np.arange(-180, 181, 30)
+    ax.set_xticks(ticks)
+    ax.set_yticks(ticks)
+    ax.grid(which="both")
+    ax.set_ylabel("Psi")
+    ax.set_xlabel("Phi", color="black")
+    return fig, ax
 
 
 def transform_tertiary(lengths, tertiary):
@@ -37,16 +49,19 @@ def transform_tertiary(lengths, tertiary):
     return trans_tert
 
 
-def validate_model(model):
+def validate_model(model, criterion):
     validation_loader = contruct_dataloader_from_disk(VALIDATION_FOLDER)
     val_size = validation_loader.dataset.__len__()
     rmsd = 0
+    loss = 0
     for i, data in enumerate(validation_loader):
         # Tertiary is [Batch, Length, 9]
         lengths, primary, evolutionary, act_phi, act_psi, act_omega, tertiary = data
         inp = model.generate_input(lengths, primary, evolutionary)
         # Doesn't require gradients to go backwards, hence detach the output
+        target = model.generate_target(lengths, act_phi, act_psi, act_omega)
         output = model(inp).detach()
+        loss += model.calculate_loss(lengths, criterion, output, target)
         # The following will be of size [Batch, Length]
         pred_phi = torch.atan2(output[:, 0, :], output[:, 1, :]).unsqueeze(1)
         pred_psi = torch.atan2(output[:, 2, :], output[:, 3, :]).unsqueeze(1)
@@ -75,8 +90,9 @@ def validate_model(model):
         rmsd += calc_rmsd(predicted_coords, actual_coords)
         # drmsd += calc_drmsd(predicted_coords, actual_coords)
     rmsd /= val_size
+    loss /= val_size
     # drmsd /= val_size
-    return val_size, rmsd
+    return val_size, loss.item(), rmsd
 
 
 def train_model(model):
@@ -88,18 +104,16 @@ def train_model(model):
     criterion = torch.nn.MSELoss()
 
     best_model_loss = 1e20
+    is_plt_initialized = False
     best_model_path = None
     stopping_condition_met = False
     minibatches_proccesed = 0
 
-    train_loss_values = []
-    validation_loss_values = []
-    rmsd_avg_values = []
-    # drmsd_avg_values = []
-
     while not stopping_condition_met:
         optimizer.zero_grad()
         model.zero_grad()
+        pred_line = None
+        act_line = None
         for i, data in enumerate(train_loader):
             minibatches_proccesed += 1
             # data is a tuple of tuple of tensors except
@@ -122,44 +136,29 @@ def train_model(model):
             optimizer.step()
 
             if minibatches_proccesed % EVAL_INTERVAL == 0:
-                val_size, rmsd = validate_model(model)
-                if rmsd < best_model_loss:
-                    best_model_loss = rmsd
+                val_size, val_loss, rmsd = validate_model(model, criterion)
+                if val_loss < best_model_loss:
+                    best_model_loss = val_loss
                     best_model_path = write_model_to_disk(model)
-                write_out("Validation loss: ", rmsd, "Train loss: ", loss.item())
-                write_out("Best model stored at " + best_model_path)
-                train_loss_values.append(loss.item())
-                validation_loss_values.append(rmsd)
-                rmsd_avg_values.append(rmsd)
-                # drmsd_avg_values.append(drmsd)
+                write_out("Validation loss: ", val_loss, "Train loss: ", loss.item())
+                write_out("RMSD: ", rmsd, "Best model stored at " + best_model_path)
                 if not HIDE_UI:
-                    output = output.detach().numpy()[0]
+                    output = output.detach().cpu().numpy()[0]
                     pred_phi = np.arctan2(output[0, :], output[1, :]) * 180.0 / np.pi
                     pred_psi = np.arctan2(output[2, :], output[3, :]) * 180.0 / np.pi
-                    pred_omega = np.arctan2(output[4, :], output[5, :]) * 180.0 / np.pi
-                    write_to_pdb(
-                        primary[0], [act_phi[0], act_psi[0], act_omega[0]], "act_test"
-                    )
-                    write_to_pdb(
-                        primary[0], [pred_phi, pred_psi, pred_omega], "pred_test"
-                    )
-                    data = {}
-                    data["pdb_data_pred"] = open("output/pred_test.pdb", "r").read()
-                    data["pdb_data_true"] = open("output/act_test.pdb", "r").read()
-                    data["validation_dataset_size"] = val_size
-                    # data["sample_num"] = sample_num
-                    data["train_loss_values"] = train_loss_values
-                    data["validation_loss_values"] = validation_loss_values
-                    data["phi_actual"] = list(act_phi[0])
-                    data["psi_actual"] = list(act_psi[0])
-                    # pred_omega = np.arctan2(output[:, 4, :], output[:, 5, :])
-                    data["phi_predicted"] = list(pred_phi)
-                    data["psi_predicted"] = list(pred_psi)
-                    # data["drmsd_avg"] = drmsd_avg_values
-                    data["rmsd_avg"] = rmsd_avg_values
-                    res = requests.post("http://localhost:5000/graph", json=data)
-                    if res.ok:
-                        print(res.json())
+                    if not is_plt_initialized:
+                        fig, ax = init_plot()
+                        pred_line, act_line, = ax.plot(
+                            pred_phi, pred_psi, "ro", act_phi[0], act_psi[0], "bo"
+                        )
+                        is_plt_initialized = True
+                    else:
+                        pred_line.set_xdata(pred_phi)
+                        pred_line.set_ydata(pred_psi)
+                        act_line.set_xdata(act_phi[0])
+                        act_line.set_ydata(act_psi[0])
+                        fig.canvas.draw()
+                        fig.canvas.flush_events()
 
             if minibatches_proccesed > MIN_BATCH_ITER:
                 stopping_condition_met = True

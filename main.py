@@ -3,10 +3,7 @@ import time
 from models.resnet import ResNet
 from preprocessing import preprocess_raw_data
 from training import train_model
-from dashboard import start_visualization
 from constants import DEVICE
-
-start_visualization()
 
 start = time.time()
 preprocess_raw_data()

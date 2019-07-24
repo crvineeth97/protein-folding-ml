@@ -3,8 +3,6 @@ from datetime import datetime
 
 import numpy as np
 import torch
-from Bio.PDB import PDBIO
-from PeptideBuilder import make_structure
 
 from constants import LEARNING_RATE, MINIBATCH_SIZE
 
@@ -39,61 +37,14 @@ def write_model_to_disk(model):
     return path
 
 
-def write_to_pdb(primary, dihedrals, name):
-    # dihedrals are in degrees
-    phi, psi, omega = dihedrals
-    structure = make_structure(primary, phi[1:], psi[1:], omega[1:])
-    out = PDBIO()
-    out.set_structure(structure)
-    out.save("output/" + name + ".pdb")
-
-
-def draw_plot(
-    fig,
-    plt,
-    validation_dataset_size,
-    sample_num,
-    train_loss_values,
-    validation_loss_values,
-):
-    def draw_with_vars():
-        ax = fig.gca()
-        ax2 = ax.twinx()
-        plt.grid(True)
-        plt.title(
-            "Training progress ("
-            + str(validation_dataset_size)
-            + " samples in validation set)"
-        )
-        train_loss_plot, = ax.plot(sample_num, train_loss_values)
-        ax.set_ylabel("Train Negative log likelihood")
-        ax.yaxis.labelpad = 0
-        validation_loss_plot, = ax2.plot(
-            sample_num, validation_loss_values, color="black"
-        )
-        ax2.set_ylabel("Validation loss")
-        ax2.set_ylim(bottom=0)
-        plt.legend(
-            [train_loss_plot, validation_loss_plot],
-            ["Train loss on last batch", "Validation loss"],
-        )
-        ax.set_xlabel("Minibatches processed (=network updates)", color="black")
-
-    return draw_with_vars
-
-
-def draw_ramachandran_plot(fig, plt, phi, psi):
-    def draw_with_vars():
-        ax = fig.gca()
-        plt.grid(True)
-        plt.title("Ramachandran plot")
-        train_loss_plot, = ax.plot(phi, psi)
-        ax.set_ylabel("Psi")
-        ax.yaxis.labelpad = 0
-        plt.legend([train_loss_plot], ["Phi psi"])
-        ax.set_xlabel("Phi", color="black")
-
-    return draw_with_vars
+def draw_ramachandran_plot(plt, ax, phi, psi):
+    plt.grid(True)
+    plt.title("Ramachandran plot")
+    train_loss_plot, = ax.plot(phi, psi)
+    ax.set_ylabel("Psi")
+    ax.yaxis.labelpad = 0
+    plt.legend([train_loss_plot], ["Phi psi"])
+    ax.set_xlabel("Phi", color="black")
 
 
 def write_result_summary(accuracy):
