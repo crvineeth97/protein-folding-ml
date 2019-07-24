@@ -45,16 +45,19 @@ class ResNet(nn.Module):
         # output                        [n, 41, L]
         return torch.cat((transformed_primary, transformed_evolutionary), dim=1)
 
-    def generate_target(self, lengths, dihedrals):
+    def generate_target(self, lengths, phi, psi, omega):
         # dihedrals are in degrees
-        target = torch.zeros(
-            MINIBATCH_SIZE, len(dihedrals) * 2, lengths[0], device=DEVICE
-        )
+        target = torch.zeros(MINIBATCH_SIZE, 6, lengths[0], device=DEVICE)
         for i in range(MINIBATCH_SIZE):
-            for j, angles in enumerate(dihedrals):
-                angles = torch.from_numpy(angles * pi / 180.0).to(DEVICE)
-                target[i, j * 2, : lengths[i]] = torch.sin(angles)
-                target[i, j * 2 + 1, : lengths[i]] = torch.cos(angles)
+            ph = torch.from_numpy(phi[i] * pi / 180.0)
+            ps = torch.from_numpy(psi[i] * pi / 180.0)
+            om = torch.from_numpy(omega[i] * pi / 180.0)
+            target[i, 0, : lengths[i]] = torch.sin(ph)
+            target[i, 1, : lengths[i]] = torch.cos(ph)
+            target[i, 2, : lengths[i]] = torch.sin(ps)
+            target[i, 3, : lengths[i]] = torch.sin(ps)
+            target[i, 4, : lengths[i]] = torch.sin(om)
+            target[i, 5, : lengths[i]] = torch.sin(om)
         return target
 
     def calculate_loss(self, lengths, criterion, output, target):

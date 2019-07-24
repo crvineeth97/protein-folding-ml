@@ -31,16 +31,22 @@ def validate_model(model):
     rmsd = 0
     drmsd = 0
     for i, data in enumerate(validation_loader):
-        lengths, primary, evolutionary, phi, psi, omega, tertiary = data
+        # Tertiary is [Batch, Length, 9]
+        lengths, primary, evolutionary, act_phi, act_psi, act_omega, tertiary = data
         inp = model.generate_input(lengths, primary, evolutionary)
-        output = model(inp)
+        # Doesn't require gradients to go backwards, hence detach the output
+        output = model(inp).detach()
         # The following will be of size [Batch, Length]
-        phi = torch.atan2(output[:, 0, :], output[:, 1, :]).unsqueeze(1)
-        psi = torch.atan2(output[:, 2, :], output[:, 3, :]).unsqueeze(1)
-        omega = torch.atan2(output[:, 4, :], output[:, 5, :]).unsqueeze(1)
+        pred_phi = torch.atan2(output[:, 0, :], output[:, 1, :]).unsqueeze(1)
+        pred_psi = torch.atan2(output[:, 2, :], output[:, 3, :]).unsqueeze(1)
+        pred_omega = torch.atan2(output[:, 4, :], output[:, 5, :]).unsqueeze(1)
         # dihedrals will be of size [Length, Batch, 3] as this is the input
         # required by pnerf functions
-        dihedrals = torch.cat((phi, psi, omega), 1).transpose(1, 2).transpose(0, 1)
+        dihedrals = (
+            torch.cat((pred_phi, pred_psi, pred_omega), 1)
+            .transpose(1, 2)
+            .transpose(0, 1)
+        )
         # Pnerf takes dihedrals and optional bond lengths and bond angles as input
         # and builds the coordinates so that rmsd can be calculated for loss
         # Divide by 100 to get in angstrom units
@@ -53,15 +59,8 @@ def validate_model(model):
             )
             / 100
         )
-        coords = coordinates.transpose(0, 1).contiguous().view(1, -1, 9).transpose(0, 1)
-        predicted_coords = coords.transpose(0, 1).contiguous().view(-1, 3)
-        actual_coords = (
-            torch.from_numpy(tertiary)
-            .unsqueeze(1)
-            .transpose(0, 1)
-            .contiguous()
-            .view(-1, 3)
-        )
+        predicted_coords = coordinates.transpose(0, 1).contiguous().view(-1, 3)
+        actual_coords = tertiary
         rmsd += calc_rmsd(predicted_coords, actual_coords)
         drmsd += calc_drmsd(predicted_coords, actual_coords)
     rmsd /= val_size
@@ -90,21 +89,17 @@ def train_model(model):
     while not stopping_condition_met:
         optimizer.zero_grad()
         model.zero_grad()
-        for minibatch_id, training_minibatch in enumerate(train_loader):
-            # training_minibatch is a tuple of tuple of tensors except
+        for i, data in enumerate(train_loader):
+            # data is a tuple of tuple of tensors except
             # lengths, which is a tuple of ints
             # Implies primary will be a tuple with MINIBATCH_SIZE number of elements
             # And each element will be of shape (Length,)
             # phi, psi and omega are in degrees here
-            lengths, primary, evolutionary, actual_phi, actual_psi, actual_omega = (
-                training_minibatch
-            )
+            lengths, primary, evolutionary, act_phi, act_psi, act_omega = data
             # inp should be of shape [Batch, 41, Max_length]
             inp = model.generate_input(lengths, primary, evolutionary)
             # target should be of shape [Batch, 6, Max_length]
-            target = model.generate_target(
-                lengths, np.array([actual_phi, actual_psi, actual_omega])
-            )
+            target = model.generate_target(lengths, act_phi, act_psi, act_omega)
             # output should be of shape [Batch, 6, Max_length]
             # sin(phi), cos(phi), sin(psi), cos(psi), sin(omega), cos(omega)
             output = model(inp)
@@ -128,13 +123,13 @@ def train_model(model):
                 if not HIDE_UI:
                     data = {}
                     data["pdb_data_pred"] = open("output/pred_test.pdb", "r").read()
-                    data["pdb_data_true"] = open("output/actual_test.pdb", "r").read()
+                    data["pdb_data_true"] = open("output/act_test.pdb", "r").read()
                     data["validation_dataset_size"] = val_size
                     # data["sample_num"] = sample_num
                     data["train_loss_values"] = train_loss_values
                     data["validation_loss_values"] = validation_loss_values
-                    data["phi_actual"] = list(actual_phi)
-                    data["psi_actual"] = list(actual_psi)
+                    data["phi_actual"] = list(act_phi)
+                    data["psi_actual"] = list(act_psi)
                     pred_phi = np.arctan2(output[:, 0, :], output[:, 1, :])
                     pred_psi = np.arctan2(output[:, 2, :], output[:, 3, :])
                     # pred_omega = np.arctan2(output[:, 4, :], output[:, 5, :])

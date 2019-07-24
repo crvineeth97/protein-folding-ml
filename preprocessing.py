@@ -58,7 +58,7 @@ def calculate_phi_from_masked_tertiary(tertiary_masked):
         points[0] = tertiary_masked[i - 1][6:]
         points[1:] = np.reshape(aa, (3, 3))
         phi.append(calculate_dihedral_from_points(points))
-    return np.array(phi, dtype=np.float) * 180.0 / np.pi
+    return np.array(phi, dtype=np.float32) * 180.0 / np.pi
 
 
 def calculate_psi_from_masked_tertiary(tertiary_masked):
@@ -85,7 +85,7 @@ def calculate_psi_from_masked_tertiary(tertiary_masked):
         points[0:3] = np.reshape(aa, (3, 3))
         points[3] = tertiary_masked[i + 1][:3]
         psi.append(calculate_dihedral_from_points(points))
-    return np.array(psi, dtype=np.float) * 180.0 / np.pi
+    return np.array(psi, dtype=np.float32) * 180.0 / np.pi
 
 
 def calculate_omega_from_masked_tertiary(tertiary_masked):
@@ -112,7 +112,7 @@ def calculate_omega_from_masked_tertiary(tertiary_masked):
         points[0:2] = np.reshape(aa[3:], (2, 3))
         points[2:] = np.reshape(tertiary_masked[i + 1][:6], (2, 3))
         omega.append(calculate_dihedral_from_points(points))
-    return np.array(omega, dtype=np.float) * 180.0 / np.pi
+    return np.array(omega, dtype=np.float32) * 180.0 / np.pi
 
 
 def masked_select(data, mask, X=None):
@@ -169,7 +169,7 @@ def read_protein(file_pointer):
             evolutionary = []
             for residue in range(21):
                 evolutionary.append(
-                    [float(step) for step in file_pointer.readline().split()]
+                    [np.float32(step) for step in file_pointer.readline().split()]
                 )
                 if len(evolutionary[-1]) != seq_len:
                     print(
@@ -200,7 +200,7 @@ def read_protein(file_pointer):
             tertiary = []
             for axis in range(3):
                 tertiary.append(
-                    [float(coord) for coord in file_pointer.readline().split()]
+                    [np.float32(coord) for coord in file_pointer.readline().split()]
                 )
                 if len(tertiary[-1]) != 3 * seq_len:
                     print(
@@ -267,7 +267,7 @@ def process_file(input_file, output_folder, save_tertiary):
         )
         evolutionary_reshaped = np.array(protein["evolutionary"]).T
         evolutionary_masked = np.array(
-            masked_select(evolutionary_reshaped, protein["mask"]), dtype=np.float
+            masked_select(evolutionary_reshaped, protein["mask"]), dtype=np.float32
         )
         # secondary_masked = np.array(
         #     masked_select(protein["secondary"], protein["mask"]), dtype=np.uint8
@@ -279,11 +279,13 @@ def process_file(input_file, output_folder, save_tertiary):
         # Putting np.zeros(9) as a signal of missing residues
         tertiary_masked = np.array(
             masked_select(tertiary_reshaped, protein["mask"], np.zeros(9)),
-            dtype=np.float,
+            dtype=np.float32,
         )
         # If the first few residues were missing, no need to consider them
         if np.allclose(tertiary_masked[0], np.zeros(9)):
             tertiary_masked = tertiary_masked[1:]
+        # TODO Check whether the last few residues need to be removed from tertiary
+
         # There are problems with some of the proteins in the dataset
         # Skip if that is the case
         skip_flg = 0
@@ -310,6 +312,7 @@ def process_file(input_file, output_folder, save_tertiary):
         assert len(omega) == masked_length
 
         if save_tertiary:
+            assert len(tertiary_masked) == masked_length
             np.savez(
                 output_folder + protein["id"] + ".npz",
                 primary=primary_masked,

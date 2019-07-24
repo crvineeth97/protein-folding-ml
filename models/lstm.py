@@ -34,7 +34,7 @@ class LSTMModel(nn.Module):
         for i, prot in enumerate(primary):
             if embedding == "one_hot":
                 onehot = torch.zeros(
-                    [MAX_PROTEIN_LENGTH, 20], dtype=torch.float64, device=self.device
+                    [MAX_PROTEIN_LENGTH, 20], dtype=torch.float32, device=self.device
                 )
                 onehot = onehot.scatter_(1, prot.view(-1, 1).type(torch.long), 1)
                 features.append(onehot)
