@@ -50,48 +50,51 @@ def transform_tertiary(lengths, tertiary):
 
 
 def validate_model(model, criterion):
-    validation_loader = contruct_dataloader_from_disk(VALIDATION_FOLDER)
-    val_size = validation_loader.dataset.__len__()
-    rmsd = 0
-    loss = 0
-    for i, data in enumerate(validation_loader):
-        # Tertiary is [Batch, Length, 9]
-        lengths, primary, evolutionary, act_phi, act_psi, act_omega, tertiary = data
-        inp = model.generate_input(lengths, primary, evolutionary)
-        # Doesn't require gradients to go backwards, hence detach the output
-        target = model.generate_target(lengths, act_phi, act_psi, act_omega)
-        output = model(inp).detach()
-        loss += model.calculate_loss(lengths, criterion, output, target)
-        # The following will be of size [Batch, Length]
-        pred_phi = torch.atan2(output[:, 0, :], output[:, 1, :]).unsqueeze(1)
-        pred_psi = torch.atan2(output[:, 2, :], output[:, 3, :]).unsqueeze(1)
-        pred_omega = torch.atan2(output[:, 4, :], output[:, 5, :]).unsqueeze(1)
-        # dihedrals will be of size [Length, Batch, 3] as this is the input
-        # required by pnerf functions
-        dihedrals = (
-            torch.cat((pred_phi, pred_psi, pred_omega), 1)
-            .transpose(1, 2)
-            .transpose(0, 1)
-        )
-        # Pnerf takes dihedrals and optional bond lengths and bond angles as input
-        # and builds the coordinates so that rmsd can be calculated for loss
-        # Divide by 100 to get in angstrom units
-        # Coordinates will be of size [Length * 3, Batch, 3]
-        # Last dimension represents the x, y, z coordinates
-        # And the Length * 3 represents N, C_a, C for each AA
-        coordinates = (
-            pnerf.point_to_coordinate(
-                pnerf.dihedral_to_point(dihedrals, DEVICE), DEVICE
+    with torch.no_grad():
+        validation_loader = contruct_dataloader_from_disk(VALIDATION_FOLDER)
+        val_size = validation_loader.dataset.__len__()
+        rmsd = 0
+        loss = 0
+        for i, data in enumerate(validation_loader):
+            # Tertiary is [Batch, Length, 9]
+            lengths, primary, evolutionary, act_phi, act_psi, act_omega, tertiary = data
+            inp = model.generate_input(lengths, primary, evolutionary)
+            # Doesn't require gradients to go backwards, hence detach the output
+            target = model.generate_target(lengths, act_phi, act_psi, act_omega)
+            output = model(inp)
+            loss += model.calculate_loss(lengths, criterion, output, target)
+            # The following will be of size [Batch, Length]
+            pred_phi = torch.atan2(output[:, 0, :], output[:, 1, :]).unsqueeze(1)
+            pred_psi = torch.atan2(output[:, 2, :], output[:, 3, :]).unsqueeze(1)
+            pred_omega = torch.atan2(output[:, 4, :], output[:, 5, :]).unsqueeze(1)
+            # dihedrals will be of size [Length, Batch, 3] as this is the input
+            # required by pnerf functions
+            dihedrals = (
+                torch.cat((pred_phi, pred_psi, pred_omega), 1)
+                .transpose(1, 2)
+                .transpose(0, 1)
             )
-            / 100
-        )
-        predicted_coords = coordinates.transpose(0, 1).contiguous().view(-1, 3)
-        actual_coords = transform_tertiary(lengths, tertiary).contiguous().view(-1, 3)
-        rmsd += calc_rmsd(predicted_coords, actual_coords)
-        # drmsd += calc_drmsd(predicted_coords, actual_coords)
-    rmsd /= val_size
-    loss /= val_size
-    # drmsd /= val_size
+            # Pnerf takes dihedrals and optional bond lengths and bond angles as input
+            # and builds the coordinates so that rmsd can be calculated for loss
+            # Divide by 100 to get in angstrom units
+            # Coordinates will be of size [Length * 3, Batch, 3]
+            # Last dimension represents the x, y, z coordinates
+            # And the Length * 3 represents N, C_a, C for each AA
+            coordinates = (
+                pnerf.point_to_coordinate(
+                    pnerf.dihedral_to_point(dihedrals, DEVICE), DEVICE
+                )
+                / 100
+            )
+            predicted_coords = coordinates.transpose(0, 1).contiguous().view(-1, 3)
+            actual_coords = (
+                transform_tertiary(lengths, tertiary).contiguous().view(-1, 3)
+            )
+            rmsd += calc_rmsd(predicted_coords, actual_coords)
+            # drmsd += calc_drmsd(predicted_coords, actual_coords)
+        rmsd /= val_size
+        loss /= val_size
+        # drmsd /= val_size
     return val_size, loss.item(), rmsd
 
 
@@ -160,7 +163,7 @@ def train_model(model):
                         fig.canvas.draw()
                         fig.canvas.flush_events()
 
-            if minibatches_proccesed > MIN_BATCH_ITER:
+            if minibatches_proccesed >= MIN_BATCH_ITER:
                 stopping_condition_met = True
                 break
 

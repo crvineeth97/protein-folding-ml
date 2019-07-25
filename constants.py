@@ -15,7 +15,7 @@ LEARNING_RATE = 0.01
 MIN_BATCH_ITER = 200000
 
 # Evaluate model on validation set every n minibatches
-EVAL_INTERVAL = 2000
+EVAL_INTERVAL = 20
 
 # List of amino acids and their integer representation
 AA_ID_DICT = {
