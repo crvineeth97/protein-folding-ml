@@ -1,17 +1,18 @@
-import time
+from time import time
 
+from constants import DEVICE
 from models.resnet import ResNet
 from preprocessing import preprocess_raw_data
 from training import train_model
-from constants import DEVICE
+from util import init_output_dir
 
-start = time.time()
+start = time()
 preprocess_raw_data()
-end = time.time()
-print("Total preprocessing time: ", end - start)
+print("Total preprocessing time: ", time() - start)
+
+init_output_dir()
 
 model = ResNet().to(DEVICE)
-start = time.time()
+start = time()
 train_model_path = train_model(model)
-end = time.time()
-print("Total training time: ", end - start)
+print("Total training time: ", time() - start)

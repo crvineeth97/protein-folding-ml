@@ -64,11 +64,11 @@ def test_model(path, criterion):
 
 
 criterion = torch.nn.MSELoss()
-input_files = listdir("output/models/")
+input_files = listdir("output/")
 input_files_filtered = filter_input_files(input_files)
-for filename in input_files_filtered:
-    print("Testing model " + filename)
-    model_path = "output/models/" + filename
+for model_dir in input_files_filtered:
+    print("Testing model " + model_dir)
+    model_path = "output/" + model_dir + "/best.model"
     loss, phi_mae, psi_mae = test_model(model_path, criterion)
     print("Testing loss: " + str(loss))
     print("Phi MAE: " + str(phi_mae))

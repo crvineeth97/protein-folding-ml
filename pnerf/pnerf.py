@@ -7,8 +7,9 @@ Paper (preprint) by Mohammed AlQuraishi:
     https://www.biorxiv.org/content/early/2018/08/06/385450
 PyTorch implementation by Felix Opolka
 """
-import math
 import collections
+import math
+
 import numpy as np
 import torch
 import torch.nn.functional as F

@@ -1,9 +1,9 @@
 import torch
 import torch.nn as nn
-
-from models.resnet_1d import resnet34
 from numpy import pi
-from constants import MINIBATCH_SIZE, DEVICE
+
+from constants import DEVICE, MINIBATCH_SIZE
+from models.resnet_1d import resnet34
 
 
 class ResNet(nn.Module):

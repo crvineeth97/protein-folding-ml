@@ -1,26 +1,22 @@
+import logging
+
+import matplotlib.pyplot as plt
 import numpy as np
 import torch
-import matplotlib.pyplot as plt
 
 import pnerf.pnerf as pnerf
 from constants import (
+    DEVICE,
     EVAL_INTERVAL,
+    HIDE_UI,
     LEARNING_RATE,
-    MIN_BATCH_ITER,
     MINIBATCH_SIZE,
+    TRAINING_EPOCHS,
     TRAINING_FOLDER,
     VALIDATION_FOLDER,
-    HIDE_UI,
-    DEVICE,
 )
 from dataloader import contruct_dataloader_from_disk
-from util import (
-    calc_rmsd,
-    set_experiment_id,
-    write_model_to_disk,
-    write_out,
-    write_result_summary,
-)
+from util import calc_rmsd, write_model_to_disk
 
 
 def init_plot():
@@ -99,26 +95,23 @@ def validate_model(model, criterion):
 
 
 def train_model(model):
-    set_experiment_id("TRAIN")
-
     train_loader = contruct_dataloader_from_disk(TRAINING_FOLDER)
-
-    optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
+    lr = LEARNING_RATE
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     criterion = torch.nn.MSELoss()
 
-    best_model_loss = 1e20
+    prev_model_val_loss = 1e20
+    best_model_val_loss = 1e20
     is_plt_initialized = False
     best_model_path = None
-    stopping_condition_met = False
-    minibatches_proccesed = 0
+    training_set_iter = 0
 
-    while not stopping_condition_met:
+    while training_set_iter < TRAINING_EPOCHS:
         optimizer.zero_grad()
         model.zero_grad()
         pred_line = None
         act_line = None
         for i, data in enumerate(train_loader):
-            minibatches_proccesed += 1
             # data is a tuple of tuple of tensors except
             # lengths, which is a tuple of ints
             # Implies primary will be a tuple with MINIBATCH_SIZE number of elements
@@ -134,17 +127,23 @@ def train_model(model):
             output = model(inp)
             loss = model.calculate_loss(lengths, criterion, output, target)
             optimizer.zero_grad()
-            write_out("Train loss:", loss.item())
+            logging.info("Train loss: %.10lf", loss.item())
             loss.backward()
             optimizer.step()
 
-            if minibatches_proccesed % EVAL_INTERVAL == 0:
+            if (i + 1) % EVAL_INTERVAL == 0:
                 val_size, val_loss, rmsd = validate_model(model, criterion)
-                if val_loss < best_model_loss:
-                    best_model_loss = val_loss
+                if val_loss < best_model_val_loss:
+                    prev_model_val_loss = best_model_val_loss
+                    best_model_val_loss = val_loss
                     best_model_path = write_model_to_disk(model)
-                write_out("Validation loss: ", val_loss, "Train loss: ", loss.item())
-                write_out("RMSD: ", rmsd, "Best model stored at " + best_model_path)
+                    if (prev_model_val_loss - best_model_val_loss) < 0.001:
+                        logging.info(
+                            "Changing learning rate from %lf to %lf", lr, lr / 5
+                        )
+                        lr /= 5
+                        for par in optimizer.param_groups:
+                            par["lr"] = lr
                 if not HIDE_UI:
                     output = output.detach().cpu().numpy()[0]
                     pred_phi = np.arctan2(output[0, :], output[1, :]) * 180.0 / np.pi
@@ -162,10 +161,12 @@ def train_model(model):
                         act_line.set_ydata(act_psi[0])
                         fig.canvas.draw()
                         fig.canvas.flush_events()
+                logging.info(
+                    "Validation loss: %.10lf Train loss: %.10lf", val_loss, loss.item()
+                )
+                logging.info(
+                    "RMSD: %.10lf Best model stored at %s", rmsd, best_model_path
+                )
+        training_set_iter += 1
 
-            if minibatches_proccesed >= MIN_BATCH_ITER:
-                stopping_condition_met = True
-                break
-
-    write_result_summary(best_model_loss)
     return best_model_path

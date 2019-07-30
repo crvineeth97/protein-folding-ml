@@ -8,14 +8,15 @@ from torch.cuda import is_available
 # prop, but not sure how effective it will be
 MINIBATCH_SIZE = 1
 
-# Learning rate of the implemented model during training
-LEARNING_RATE = 0.01
+# Learning rate of the implemented model during training start
+# The learning rate will change while training
+LEARNING_RATE = 0.1
 
-# Minimum number of minibatch iterations
-MIN_BATCH_ITER = 200000
+# Number of times to go through the dataset while training
+TRAINING_EPOCHS = 20
 
 # Evaluate model on validation set every n minibatches
-EVAL_INTERVAL = 20
+EVAL_INTERVAL = 1000
 
 # List of amino acids and their integer representation
 AA_ID_DICT = {
@@ -69,5 +70,5 @@ TESTING_FOLDER = "data/preprocessed/testing_no_missing/"
 # Which device to use for tensor computations
 DEVICE = device("cpu")
 if is_available():
-    print("CUDA is available, using GPU")
+    print("CUDA is available. Using GPU")
     DEVICE = device("cuda")

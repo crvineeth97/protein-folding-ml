@@ -7,8 +7,8 @@ import numpy as np
 from constants import (
     AA_ID_DICT,
     DSSP_DICT,
-    MASK_DICT,
     FORCE_PREPROCESSING_OVERWRITE,
+    MASK_DICT,
     PREPROCESS_WITH_MISSING_RESIDUES,
 )
 

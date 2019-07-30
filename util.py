@@ -1,58 +1,46 @@
+import logging
 import math
 from datetime import datetime
+from os import makedirs
 
 import numpy as np
 import torch
 
-from constants import LEARNING_RATE, MINIBATCH_SIZE
+from constants import (
+    DEVICE,
+    EVAL_INTERVAL,
+    LEARNING_RATE,
+    MINIBATCH_SIZE,
+    PREPROCESS_WITH_MISSING_RESIDUES,
+    TRAINING_EPOCHS,
+)
 
 
-def set_experiment_id(data_set_identifier):
-    output_string = datetime.now().strftime("%Y-%m-%d_%H_%M_%S")
-    output_string += "-" + data_set_identifier
-    output_string += "-LR" + str(LEARNING_RATE).replace(".", "_")
-    output_string += "-MB" + str(MINIBATCH_SIZE)
-    globals().__setitem__("experiment_id", output_string)
-
-
-def write_out(*args, end="\n"):
-    output_string = (
-        datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        + ": "
-        + str.join(" ", [str(a) for a in args])
-        + end
+def init_output_dir():
+    model_dir = datetime.now().strftime("%Y-%m-%d %H_%M_%S")
+    globals().__setitem__("experiment_id", model_dir)
+    model_dir = "output/" + model_dir + "/"
+    makedirs(model_dir)
+    logging.basicConfig(
+        filename=model_dir + "log.txt",
+        format="%(asctime)s %(message)s",
+        datefmt="%H:%M:%S",
+        level=logging.INFO,
     )
-    if globals().get("experiment_id") is not None:
-        with open(
-            "output/" + globals().get("experiment_id") + ".txt", "a+"
-        ) as output_file:
-            output_file.write(output_string)
-            output_file.flush()
-    print(output_string, end="")
+    logging.info("MINIBATCH_SIZE: %d", MINIBATCH_SIZE)
+    logging.info("LEARNING_RATE: %f", LEARNING_RATE)
+    logging.info("TRAINING_EPOCHS: %d", TRAINING_EPOCHS)
+    logging.info("EVAL_INTERVAL: %d", EVAL_INTERVAL)
+    logging.info(
+        "PREPROCESS_WITH_MISSING_RESIDUES: %s", str(PREPROCESS_WITH_MISSING_RESIDUES)
+    )
+    logging.info("DEVICE: %s", DEVICE)
 
 
 def write_model_to_disk(model):
-    path = "output/models/" + globals().get("experiment_id") + ".model"
+    path = "output/" + globals().get("experiment_id") + "/" + "best.model"
     torch.save(model, path)
     return path
-
-
-def draw_ramachandran_plot(plt, ax, phi, psi):
-    plt.grid(True)
-    plt.title("Ramachandran plot")
-    train_loss_plot, = ax.plot(phi, psi)
-    ax.set_ylabel("Psi")
-    ax.yaxis.labelpad = 0
-    plt.legend([train_loss_plot], ["Phi psi"])
-    ax.set_xlabel("Phi", color="black")
-
-
-def write_result_summary(accuracy):
-    output_string = globals().get("experiment_id") + ": " + str(accuracy) + "\n"
-    with open("output/result_summary.txt", "a+") as output_file:
-        output_file.write(output_string)
-        output_file.flush()
-    print(output_string, end="")
 
 
 def calc_pairwise_distances(chain_a, chain_b, device):
