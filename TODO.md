@@ -1,11 +1,11 @@
 ### Improvements that can be made to the code
 
 - [ ] Fix resnet_2d.py
-- [ ] Fix validation part of the train function in main
 - [ ] Fix calculation of RMSD and DRMSD
 - [ ] Add multiple GPU support and distributed training
 - [ ] Improve the write_out function so that it is efficient
 - [ ] Optimize input, output and target generation in Resnet
+- [x] Fix validation part of the train function in main
 - [x] Use float16 instead of float32? Avoid using float16 because compute capability of the 1080TI is 6.1 and float16 performance is much slower than float 32
 - [x] Resnet_1D is not multiplying the channels by 2. Check why
 - [x] Store the preprocessed files without the padding so that the size of the file is minimized
