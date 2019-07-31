@@ -1,6 +1,6 @@
 from os import listdir
 
-from numpy import load
+import numpy as np
 from torch.utils.data import DataLoader, Dataset
 
 from constants import MINIBATCH_SIZE
@@ -23,9 +23,9 @@ class ProteinNetDataset(Dataset):
         self.filenames = listdir(foldername)
 
     def __getitem__(self, index):
-        protein = load(self.foldername + self.filenames[index])
+        protein = np.load(self.foldername + self.filenames[index])
         length = protein["primary"].shape[0]
-        if "valid" in self.foldername or "test" in self.foldername:
+        if "validation" in self.foldername or "testing" in self.foldername:
             return (
                 length,
                 protein["primary"],

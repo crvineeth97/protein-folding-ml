@@ -16,7 +16,7 @@ class ResNet(nn.Module):
     def generate_input(self, lengths, primary, evolutionary):
         """
         Generate input for each minibatch. Pad the input feature vectors
-        so that the final input shape is [MINIBATCH_SIZE, Max_length, 41]
+        so that the final input shape is [MINIBATCH_SIZE, 41, Max_length]
         Args:
         lengths: Tuple of all protein lengths in current minibatch
         primary: Tuple of numpy arrays of shape (l,) describing the
@@ -29,6 +29,7 @@ class ResNet(nn.Module):
             MINIBATCH_SIZE, 20, lengths[0], device=DEVICE, dtype=torch.float32
         )
 
+        # TODO: Use pythonic way
         for i in range(MINIBATCH_SIZE):
             for j in range(lengths[i]):
                 residue = int(primary[i][j])
@@ -38,8 +39,8 @@ class ResNet(nn.Module):
             MINIBATCH_SIZE, 21, lengths[0], device=DEVICE, dtype=torch.float32
         )
         for i in range(MINIBATCH_SIZE):
-            transformed_evolutionary[i, :, : lengths[i]] = torch.transpose(
-                torch.from_numpy(evolutionary[i]), 0, 1
+            transformed_evolutionary[i, :, : lengths[i]] = torch.from_numpy(
+                evolutionary[i].T
             )
 
         # transformed_primary           [n, 20, L]

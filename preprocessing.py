@@ -9,7 +9,7 @@ from constants import (
     DSSP_DICT,
     FORCE_PREPROCESSING_OVERWRITE,
     MASK_DICT,
-    PREPROCESS_WITH_MISSING_RESIDUES,
+    PREPROCESS_PROTEIN_WITH_MISSING_RESIDUES,
 )
 
 
@@ -41,17 +41,17 @@ def calculate_phi_from_masked_tertiary(tertiary_masked):
     using the coordinates of the C{i-1}, N{i}, Ca{i}, C{i} atoms. Hence,
     the phi angle of the first amino acid is always 0
     """
-    flg = 0
+    is_previous_aa_present = False
     phi = []
     for i, aa in enumerate(tertiary_masked):
         # If there were missing residues, we don't have their tertiary
         # positions and hence phi will be 0 for the first amino acid
         # after the missing residues, because we don't have C{i-1}
         if np.allclose(aa, np.zeros(9)):
-            flg = 0
+            is_previous_aa_present = False
             continue
-        if flg == 0:
-            flg = 1
+        if not is_previous_aa_present:
+            is_previous_aa_present = True
             phi.append(0)
             continue
         points = np.zeros((4, 3))
@@ -67,7 +67,7 @@ def calculate_psi_from_masked_tertiary(tertiary_masked):
     using the coordinates of the N{i}, Ca{i}, C{i}, N{i+1} atoms. Hence,
     the psi angle of the last amino acid is always 0
     """
-    flg = 1
+    is_next_aa_present = True
     psi = []
     sz = len(tertiary_masked)
     for i, aa in enumerate(tertiary_masked):
@@ -75,14 +75,14 @@ def calculate_psi_from_masked_tertiary(tertiary_masked):
         # positions and hence psi will be 0 for the last amino acid
         # before the missing residues, because we don't have N{i+1}
         if i + 1 == sz or np.allclose(tertiary_masked[i + 1], np.zeros(9)):
-            flg = 0
+            is_next_aa_present = False
             psi.append(0)
             continue
-        if flg == 0:
-            flg = 1
+        if not is_next_aa_present:
+            is_next_aa_present = True
             continue
         points = np.zeros((4, 3))
-        points[0:3] = np.reshape(aa, (3, 3))
+        points[:3] = np.reshape(aa, (3, 3))
         points[3] = tertiary_masked[i + 1][:3]
         psi.append(calculate_dihedral_from_points(points))
     return np.array(psi, dtype=np.float32) * 180.0 / np.pi
@@ -94,7 +94,7 @@ def calculate_omega_from_masked_tertiary(tertiary_masked):
     using the coordinates of the Ca{i}, C{i}, N{i+1}, Ca{i+1} atoms. Hence,
     the omega angle of the last amino acid is always 0
     """
-    flg = 1
+    is_next_aa_present = True
     omega = []
     sz = len(tertiary_masked)
     for i, aa in enumerate(tertiary_masked):
@@ -102,11 +102,11 @@ def calculate_omega_from_masked_tertiary(tertiary_masked):
         # positions and hence omega will be 0 for the last amino acid
         # before the missing residues, because we don't have C{i-1}
         if i + 1 == sz or np.allclose(tertiary_masked[i + 1], np.zeros(9)):
-            flg = 0
+            is_next_aa_present = False
             omega.append(0)
             continue
-        if flg == 0:
-            flg = 1
+        if not is_next_aa_present:
+            is_next_aa_present = True
             continue
         points = np.zeros((4, 3))
         points[0:2] = np.reshape(aa[3:], (2, 3))
@@ -125,7 +125,7 @@ def masked_select(data, mask, X=None):
     Eg: data = [A, C, D, E, F, G, H, I, K, L, M, N] => Assume all are chars 'A'
         mask = [0, 0, 1, 0, 0, 1, 1, 1, 0, 1, 1, 0]
         X = 'X'
-        output = [X, D, X, G, H, I, X, L, M, X]
+        output = [D, X, G, H, I, X, L, M]
         Without X, the output would mean that C and G are adjacent and therefore the
         calculations of backbone angles will go wrong
     The above is just an example and this function is not applied to the primary sequence
@@ -136,6 +136,11 @@ def masked_select(data, mask, X=None):
             if i != 0 and mask[i - 1] == 0 and X is not None:
                 output.append(X)
             output.append(data[i])
+
+    #  If there is an X at the beginning, remove it
+    if X is not None and np.allclose(output[0], X):
+        output = output[1:]
+
     return output
 
 
@@ -145,9 +150,13 @@ def read_protein(file_pointer):
     is_protein_info_correct = True
 
     while True:
-        if not is_protein_info_correct:
-            return {}
         next_line = file_pointer.readline()
+
+        if not is_protein_info_correct:
+            if next_line == "\n":
+                return {}
+            else:
+                continue
 
         # ID of the protein
         if next_line == "[ID]\n":
@@ -156,6 +165,7 @@ def read_protein(file_pointer):
 
         # Amino acid sequence of the protein
         elif next_line == "[PRIMARY]\n":
+            # Convert amino acids into their numeric representation
             primary = encode_primary_string(file_pointer.readline()[:-1])
             seq_len = len(primary)
             dict_.update({"primary": primary})
@@ -169,7 +179,10 @@ def read_protein(file_pointer):
             evolutionary = []
             for residue in range(21):
                 evolutionary.append(
-                    [np.float32(step) for step in file_pointer.readline().split()]
+                    [
+                        np.float32(log_likelihoods)
+                        for log_likelihoods in file_pointer.readline().split()
+                    ]
                 )
                 if len(evolutionary[-1]) != seq_len:
                     print(
@@ -178,7 +191,7 @@ def read_protein(file_pointer):
                         + ". Skipping it"
                     )
                     is_protein_info_correct = False
-                    break
+                    continue
             dict_.update({"evolutionary": evolutionary})
 
         # Secondary structure information of the protein
@@ -200,7 +213,10 @@ def read_protein(file_pointer):
             tertiary = []
             for axis in range(3):
                 tertiary.append(
-                    [np.float32(coord) for coord in file_pointer.readline().split()]
+                    [
+                        np.float32(coord) / 100.0
+                        for coord in file_pointer.readline().split()
+                    ]
                 )
                 if len(tertiary[-1]) != 3 * seq_len:
                     print(
@@ -209,7 +225,7 @@ def read_protein(file_pointer):
                         + ". Skipping it"
                     )
                     is_protein_info_correct = False
-                    break
+                    continue
             dict_.update({"tertiary": tertiary})
 
         # Some residues might be missing from a protein
@@ -224,6 +240,7 @@ def read_protein(file_pointer):
                     + ". Skipping it"
                 )
                 is_protein_info_correct = False
+                continue
             dict_.update({"mask": mask})
 
         # All the information of the current protein
@@ -244,12 +261,17 @@ def process_file(input_file, output_folder, save_tertiary):
     while True:
         # While there's more proteins to process
         protein = read_protein(input_file_pointer)
+
+        # If there was an error in the protein, skip it
         if protein == {}:
             continue
+
+        # Reached end of file, stop processing
         if protein is None:
             break
 
-        if not PREPROCESS_WITH_MISSING_RESIDUES:
+        # Preprocess all the proteins that do not have missing residues
+        if not PREPROCESS_PROTEIN_WITH_MISSING_RESIDUES:
             skip_flg = 0
             prv = 0
             for ind, el in enumerate(np.argwhere(protein["mask"])):
@@ -261,33 +283,36 @@ def process_file(input_file, output_folder, save_tertiary):
             if skip_flg:
                 continue
 
-        sequence_length = len(protein["primary"])
         primary_masked = np.array(
             masked_select(protein["primary"], protein["mask"]), dtype=np.uint8
         )
-        evolutionary_reshaped = np.array(protein["evolutionary"]).T
+
+        evolutionary_transposed = np.array(protein["evolutionary"]).T
         evolutionary_masked = np.array(
-            masked_select(evolutionary_reshaped, protein["mask"]), dtype=np.float32
+            masked_select(evolutionary_transposed, protein["mask"]), dtype=np.float32
         )
+
         # secondary_masked = np.array(
         #     masked_select(protein["secondary"], protein["mask"]), dtype=np.uint8
         # )
-        tertiary_transposed = np.ravel(np.array(protein["tertiary"]).T)
-        tertiary_reshaped = (
-            np.reshape(tertiary_transposed, (sequence_length, 9)) / 100.0
-        )
-        # Putting np.zeros(9) as a signal of missing residues
+
+        # protein["tertiary"] is of shape [3, 3 * Length]
+        tertiary_transposed = np.array(protein["tertiary"]).T
+        tertiary_reshaped = np.reshape(tertiary_transposed, (-1, 9))
+
+        # X is np.zeros(9) for tertiary info
+        # Putting X as a signal of missing residues
+        # tertiary_masked is of shape [Masked_Length + X_count, 9]
         tertiary_masked = np.array(
             masked_select(tertiary_reshaped, protein["mask"], np.zeros(9)),
             dtype=np.float32,
         )
-        # If the first few residues were missing, no need to consider them
-        if np.allclose(tertiary_masked[0], np.zeros(9)):
-            tertiary_masked = tertiary_masked[1:]
-        # TODO Check whether the last few residues need to be removed from tertiary
 
         # There are problems with some of the proteins in the dataset
         # Skip if that is the case
+
+        # TODO Make it such that only the residue is missing and don't
+        # skip the whole protein
         skip_flg = 0
         for coords in tertiary_masked:
             if not np.allclose(coords, np.zeros(9)) and (
@@ -353,13 +378,13 @@ def preprocess_raw_data():
     input_files_filtered = filter_input_files(input_files)
     for filename in input_files_filtered:
         preprocessed_folder_path = "data/preprocessed/" + filename + "/"
-        if not PREPROCESS_WITH_MISSING_RESIDUES:
+        if not PREPROCESS_PROTEIN_WITH_MISSING_RESIDUES:
             preprocessed_folder_path = preprocessed_folder_path[:-1] + "_no_missing/"
         if FORCE_PREPROCESSING_OVERWRITE:
             rmtree(preprocessed_folder_path)
         if not exists(preprocessed_folder_path):
             makedirs(preprocessed_folder_path)
-            if "valid" in filename or "test" in filename:
+            if "validation" in filename or "testing" in filename:
                 # Careful while saving tertiary info for proteins with missing residues
                 process_file(filename, preprocessed_folder_path, True)
             else:

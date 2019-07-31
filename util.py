@@ -1,5 +1,6 @@
 import logging
 import math
+import sys
 from datetime import datetime
 from os import makedirs
 
@@ -11,7 +12,7 @@ from constants import (
     EVAL_INTERVAL,
     LEARNING_RATE,
     MINIBATCH_SIZE,
-    PREPROCESS_WITH_MISSING_RESIDUES,
+    PREPROCESS_PROTEIN_WITH_MISSING_RESIDUES,
     TRAINING_EPOCHS,
 )
 
@@ -21,18 +22,21 @@ def init_output_dir():
     globals().__setitem__("experiment_id", model_dir)
     model_dir = "output/" + model_dir + "/"
     makedirs(model_dir)
+    file_handler = logging.FileHandler(filename=model_dir + "log.txt")
+    stdout_handler = logging.StreamHandler(sys.stdout)
+    handlers = [file_handler, stdout_handler]
     logging.basicConfig(
-        filename=model_dir + "log.txt",
         format="%(asctime)s %(message)s",
         datefmt="%H:%M:%S",
         level=logging.INFO,
+        handlers=handlers,
     )
     logging.info("MINIBATCH_SIZE: %d", MINIBATCH_SIZE)
     logging.info("LEARNING_RATE: %f", LEARNING_RATE)
     logging.info("TRAINING_EPOCHS: %d", TRAINING_EPOCHS)
     logging.info("EVAL_INTERVAL: %d", EVAL_INTERVAL)
     logging.info(
-        "PREPROCESS_WITH_MISSING_RESIDUES: %s", str(PREPROCESS_WITH_MISSING_RESIDUES)
+        "PREPROCESS_PROTEIN_WITH_MISSING_RESIDUES: %s", str(PREPROCESS_PROTEIN_WITH_MISSING_RESIDUES)
     )
     logging.info("DEVICE: %s", DEVICE)
 

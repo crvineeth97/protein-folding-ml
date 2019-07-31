@@ -11,6 +11,7 @@ from constants import (
     HIDE_UI,
     LEARNING_RATE,
     MINIBATCH_SIZE,
+    PRINT_LOSS_INTERVAL,
     TRAINING_EPOCHS,
     TRAINING_FOLDER,
     VALIDATION_FOLDER,
@@ -46,11 +47,11 @@ def transform_tertiary(lengths, tertiary):
 
 
 def validate_model(model, criterion):
+    validation_loader = contruct_dataloader_from_disk(VALIDATION_FOLDER)
+    val_size = len(validation_loader.dataset)
+    rmsd = 0
+    loss = 0
     with torch.no_grad():
-        validation_loader = contruct_dataloader_from_disk(VALIDATION_FOLDER)
-        val_size = validation_loader.dataset.__len__()
-        rmsd = 0
-        loss = 0
         for i, data in enumerate(validation_loader):
             # Tertiary is [Batch, Length, 9]
             lengths, primary, evolutionary, act_phi, act_psi, act_omega, tertiary = data
@@ -63,13 +64,10 @@ def validate_model(model, criterion):
             pred_phi = torch.atan2(output[:, 0, :], output[:, 1, :]).unsqueeze(1)
             pred_psi = torch.atan2(output[:, 2, :], output[:, 3, :]).unsqueeze(1)
             pred_omega = torch.atan2(output[:, 4, :], output[:, 5, :]).unsqueeze(1)
-            # dihedrals will be of size [Length, Batch, 3] as this is the input
+            # dihedrals will be converted from [Batch, 3, length]
+            # [Length, Batch, 3] as this is the input
             # required by pnerf functions
-            dihedrals = (
-                torch.cat((pred_phi, pred_psi, pred_omega), 1)
-                .transpose(1, 2)
-                .transpose(0, 1)
-            )
+            dihedrals = torch.cat((pred_phi, pred_psi, pred_omega), 1).permute(2, 0, 1)
             # Pnerf takes dihedrals and optional bond lengths and bond angles as input
             # and builds the coordinates so that rmsd can be calculated for loss
             # Divide by 100 to get in angstrom units
@@ -96,23 +94,22 @@ def validate_model(model, criterion):
 
 def train_model(model):
     train_loader = contruct_dataloader_from_disk(TRAINING_FOLDER)
-    lr = LEARNING_RATE
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    train_size = len(train_loader.dataset)
+    # TODO Try various options of Adam
+    optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
     criterion = torch.nn.MSELoss()
 
-    prev_model_val_loss = 1e20
     best_model_val_loss = 1e20
     is_plt_initialized = False
     best_model_path = None
     training_set_iter = 0
 
     while training_set_iter < TRAINING_EPOCHS:
-        optimizer.zero_grad()
-        model.zero_grad()
         pred_line = None
         act_line = None
+        running_train_loss = 0
         for i, data in enumerate(train_loader):
-            # data is a tuple of tuple of tensors except
+            # data is a tuple of tuple of numpy arrays except
             # lengths, which is a tuple of ints
             # Implies primary will be a tuple with MINIBATCH_SIZE number of elements
             # And each element will be of shape (Length,)
@@ -126,24 +123,24 @@ def train_model(model):
             # sin(phi), cos(phi), sin(psi), cos(psi), sin(omega), cos(omega)
             output = model(inp)
             loss = model.calculate_loss(lengths, criterion, output, target)
+            running_train_loss += loss.item()
             optimizer.zero_grad()
-            logging.info("Train loss: %.10lf", loss.item())
             loss.backward()
             optimizer.step()
+            if (i + 1) % PRINT_LOSS_INTERVAL == 0:
+                logging.info(
+                    "[%d|%.2f%%] Train loss: %.10lf",
+                    training_set_iter,
+                    (i / train_size) * 100,
+                    running_train_loss / PRINT_LOSS_INTERVAL,
+                )
+                running_train_loss = 0
 
             if (i + 1) % EVAL_INTERVAL == 0:
                 val_size, val_loss, rmsd = validate_model(model, criterion)
                 if val_loss < best_model_val_loss:
-                    prev_model_val_loss = best_model_val_loss
                     best_model_val_loss = val_loss
                     best_model_path = write_model_to_disk(model)
-                    if (prev_model_val_loss - best_model_val_loss) < 0.001:
-                        logging.info(
-                            "Changing learning rate from %lf to %lf", lr, lr / 5
-                        )
-                        lr /= 5
-                        for par in optimizer.param_groups:
-                            par["lr"] = lr
                 if not HIDE_UI:
                     output = output.detach().cpu().numpy()[0]
                     pred_phi = np.arctan2(output[0, :], output[1, :]) * 180.0 / np.pi
@@ -161,12 +158,7 @@ def train_model(model):
                         act_line.set_ydata(act_psi[0])
                         fig.canvas.draw()
                         fig.canvas.flush_events()
-                logging.info(
-                    "Validation loss: %.10lf Train loss: %.10lf", val_loss, loss.item()
-                )
-                logging.info(
-                    "RMSD: %.10lf Best model stored at %s", rmsd, best_model_path
-                )
+                logging.info("\tValidation loss: %.10lf, RMSD: %.10lf", val_loss, rmsd)
         training_set_iter += 1
 
     return best_model_path
