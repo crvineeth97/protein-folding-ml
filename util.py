@@ -1,8 +1,8 @@
 import logging
 import math
+import os
 import sys
 from datetime import datetime
-from os import makedirs
 
 import numpy as np
 import torch
@@ -22,7 +22,12 @@ def init_output_dir(model):
     model_dir = datetime.now().strftime("%Y-%m-%d %H_%M_%S")
     globals().__setitem__("experiment_id", model_dir)
     model_dir = "output/" + model_dir + "/"
-    makedirs(model_dir)
+    os.makedirs(model_dir)
+    os.system(
+        'rsync -ar --include="*/" --include="*.py" --exclude="*" ./ '
+        + model_dir
+        + "code/"
+    )
     file_handler = logging.FileHandler(filename=model_dir + "log.txt")
     stdout_handler = logging.StreamHandler(sys.stdout)
     handlers = [file_handler, stdout_handler]

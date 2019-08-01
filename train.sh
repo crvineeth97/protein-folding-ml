@@ -11,19 +11,19 @@
 #SBATCH --mail-type=END
 #SBATCH --mail-user=ravindrachelur.v@research.iiit.ac.in
 
-###SBATCH -w gnode32
+##SBATCH -w gnode32
 # Set some environment variables for the current script
 export EXP_NAME="dihedral_predictions"
 
 # Copy necessary files to a scratch directory and cd into it
 mkdir -p /scratch/$USER/$EXP_NAME
-rsync -qavP ./ /scratch/$USER/$EXP_NAME
+rsync -aP ./ /scratch/$USER/$EXP_NAME
 cd /scratch/$USER/$EXP_NAME
 
-# rsync -qavP ada:/share2/$USER/data/casp12/training_30 ./data/raw/
-# rsync -qavP ada:/share2/$USER/data/casp12/validation ./data/raw/
-# rsync -qavP ada:/share2/$USER/data/casp12/testing ./data/raw/
-rsync -qavP ada:/share2/$USER/$EXP_NAME/data/preprocessed ./data
+# rsync -aP ada:/share2/$USER/data/casp12/training_30 ./data/raw/
+# rsync -aP ada:/share2/$USER/data/casp12/validation ./data/raw/
+# rsync -aP ada:/share2/$USER/data/casp12/testing ./data/raw/
+rsync -aP ada:/share2/$USER/$EXP_NAME/data/preprocessed ./data
 
 # Load the necessary modules
 module load cuda/10.0
@@ -34,4 +34,4 @@ source activate pyt
 python main.py
 conda deactivate pyt
 
-rsync -qavP ./ ada:/share2/$USER/$EXP_NAME
+rsync -aP ./ ada:/share2/$USER/$EXP_NAME
