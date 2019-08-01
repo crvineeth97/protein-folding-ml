@@ -23,9 +23,11 @@ def init_output_dir(model):
     globals().__setitem__("experiment_id", model_dir)
     model_dir = "output/" + model_dir + "/"
     os.makedirs(model_dir)
+    os.makedirs(model_dir + "code/")
     os.system(
-        'rsync -ar --include="*/" --include="*.py" --exclude="*" ./ '
-        + model_dir
+        "rsync -ar --include='*/' --include='*\.py' "
+        + "--include='*\.sh' --exclude='*' ./ "
+        + "\ ".join(model_dir.split(" "))
         + "code/"
     )
     file_handler = logging.FileHandler(filename=model_dir + "log.txt")
