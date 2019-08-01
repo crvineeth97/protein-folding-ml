@@ -40,7 +40,7 @@ def init_output_dir(model):
         "PREPROCESS_PROTEIN_WITH_MISSING_RESIDUES: %s",
         str(PREPROCESS_PROTEIN_WITH_MISSING_RESIDUES),
     )
-    logging.info("PRINT_LOSS_INTERVAL: %f", PRINT_LOSS_INTERVAL)
+    logging.info("PRINT_LOSS_INTERVAL: %d", PRINT_LOSS_INTERVAL)
     logging.info("TRAINING_EPOCHS: %d", TRAINING_EPOCHS)
     logging.info(model)
 

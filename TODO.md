@@ -7,6 +7,7 @@
 - [ ] Use radians instead of degrees, everywhere
 - [ ] Combine omega and psi calculation
 - [ ] Use LSTM layers after the resnet instead of fully connected layers
+- [ ] Different activation functions to try: Tanh, SoftSign, HardTanh
 - [x] Improve the write_out function so that it is efficient
 - [x] Fix validation part of the train function in main
 - [x] Use float16 instead of float32? Avoid using float16 because compute capability of the 1080TI is 6.1 and float16 performance is much slower than float 32

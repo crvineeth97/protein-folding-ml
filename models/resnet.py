@@ -79,10 +79,10 @@ class ResNet(nn.Module):
         output = output.transpose(1, 2)
         # [Batch, Max_length, 512]
         output = self.fc1(output)
-        output = nn.functional.relu(output)
+        output = nn.functional.relu_(output)
         # [Batch, Max_length, 64)]
         output = self.fc2(output)
-        output = torch.tanh(output)
+        output = nn.functional.hardtanh_(output)
         # [Batch, Max_length, 4)]
         output = output.transpose(1, 2)
         # [Batch, 4, Max_length]

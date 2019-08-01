@@ -29,7 +29,7 @@ def calculate_dihedral_from_points(points):
         try:
             n[i - 1] = tmp / np.linalg.norm(tmp)
         except RuntimeWarning:
-            logging.info("M", end="")
+            logging.info("Error", end="")
     m = np.cross(n[0], b[1] / np.linalg.norm(b[1]))
     x = np.dot(n[0], n[1])
     y = np.dot(m, n[1])
@@ -187,9 +187,8 @@ def read_protein(file_pointer):
                 )
                 if len(evolutionary[-1]) != seq_len:
                     logging.info(
-                        "Error in evolutionary information of protein with id "
-                        + id_
-                        + ". Skipping it"
+                        "Error in evolutionary information of protein with id %s. Skipping it",
+                        id_,
                     )
                     is_protein_info_correct = False
                     continue
@@ -221,9 +220,8 @@ def read_protein(file_pointer):
                 )
                 if len(tertiary[-1]) != 3 * seq_len:
                     logging.info(
-                        "Error in tertiary information of protein with id "
-                        + id_
-                        + ". Skipping it"
+                        "Error in tertiary information of protein with id %s. Skipping it",
+                        id_,
                     )
                     is_protein_info_correct = False
                     continue
@@ -236,9 +234,8 @@ def read_protein(file_pointer):
             mask = list([MASK_DICT[aa] for aa in file_pointer.readline()[:-1]])
             if len(mask) != seq_len:
                 logging.info(
-                    "Error in masking information of protein with id "
-                    + id_
-                    + ". Skipping it"
+                    "Error in masking information of protein with id %s. Skipping it",
+                    id_,
                 )
                 is_protein_info_correct = False
                 continue
@@ -362,7 +359,7 @@ def process_file(input_file, output_folder, save_tertiary):
             logging.info("Last: %s - %d proteins processed", protein["id"], idx)
 
     input_file_pointer.close()
-    logging.info("Wrote output of ", idx, " proteins to ", output_folder, " folder")
+    logging.info("Wrote output of %d proteins to %s folder", idx, output_folder)
 
 
 def filter_input_files(input_files):
@@ -394,10 +391,10 @@ def preprocess_raw_data():
                 process_file(filename, preprocessed_folder_path, False)
         else:
             logging.info(
-                "Preprocessed files already present in",
+                "Preprocessed files already present in %s directory.\
+                    Use --force-pre-processing-overwrite or delete the\
+                        folder manually to overwrite",
                 preprocessed_folder_path,
-                "directory. Use --force-pre-processing-overwrite",
-                "or delete the folder manually to overwrite",
             )
 
     logging.info("Completed pre-processing.")
