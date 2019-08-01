@@ -1,6 +1,6 @@
 #!/bin/bash
-#SBATCH -A research
 #SBATCH --qos=medium
+#SBATCH -A research
 #SBATCH -p long
 #SBATCH -n 10
 #SBATCH -N 1

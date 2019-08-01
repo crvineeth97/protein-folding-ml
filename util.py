@@ -52,10 +52,9 @@ def init_output_dir(model):
     logging.info(model)
 
 
-def write_model_to_disk(model):
-    path = "output/" + globals().get("experiment_id") + "/" + "best.model"
+def write_model_to_disk(model, name):
+    path = "output/" + globals().get("experiment_id") + "/" + name + ".model"
     torch.save(model, path)
-    return path
 
 
 def calc_pairwise_distances(chain_a, chain_b, device):

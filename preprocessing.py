@@ -367,7 +367,7 @@ def filter_input_files(input_files):
     Returns a list of files that do not have the provided
     file_endings from the provided list of files
     """
-    disallowed_file_endings = (".gitignore", ".DS_Store")
+    disallowed_file_endings = (".gitignore", ".DS_Store", ".git")
     return list(filter(lambda x: not x.endswith(disallowed_file_endings), input_files))
 
 
@@ -391,9 +391,11 @@ def preprocess_raw_data():
                 process_file(filename, preprocessed_folder_path, False)
         else:
             logging.info(
-                "Preprocessed files already present in %s directory.\
-                    Use --force-pre-processing-overwrite or delete the\
-                        folder manually to overwrite",
+                """
+                Preprocessed files already present in %s directory.
+                Use --force-pre-processing-overwrite or delete the
+                folder manually to overwrite
+                """,
                 preprocessed_folder_path,
             )
 

@@ -107,7 +107,6 @@ def train_model(model):
 
     best_model_val_loss = 1e20
     is_plt_initialized = False
-    best_model_path = None
     training_set_iter = 0
 
     while training_set_iter < TRAINING_EPOCHS:
@@ -146,7 +145,7 @@ def train_model(model):
                 val_size, val_loss, rmsd = validate_model(model, criterion)
                 if val_loss < best_model_val_loss:
                     best_model_val_loss = val_loss
-                    best_model_path = write_model_to_disk(model)
+                    write_model_to_disk(model, "best")
                 if not HIDE_UI:
                     output = output.detach().cpu().numpy()[0]
                     pred_phi = np.arctan2(output[0, :], output[1, :]) * 180.0 / np.pi
@@ -165,6 +164,5 @@ def train_model(model):
                         fig.canvas.draw()
                         fig.canvas.flush_events()
                 logging.info("\tValidation loss: %.10lf, RMSD: %.10lf", val_loss, rmsd)
+        write_model_to_disk(model, "latest")
         training_set_iter += 1
-
-    return best_model_path

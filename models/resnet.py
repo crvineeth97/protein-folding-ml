@@ -3,13 +3,13 @@ import torch.nn as nn
 import numpy as np
 
 from constants import DEVICE, MINIBATCH_SIZE
-from models.resnet_1d import resnet34
+from models.resnet_1d import resnet98
 
 
 class ResNet(nn.Module):
     def __init__(self):
         super(ResNet, self).__init__()
-        self.reslay = resnet34()
+        self.reslay = resnet98()
         self.fc1 = nn.Linear(512, 64)
         self.fc2 = nn.Linear(64, 4)
 

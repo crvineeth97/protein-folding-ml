@@ -21,7 +21,7 @@ def compute_mae(lengths, pred, act):
 
 
 def test_model(path, criterion):
-    model = torch.load(path)
+    model = torch.load(path, map_location={"cuda:0": "cpu"})
     is_plt_initialized = False
     loss = 0
     phi_mae = 0
