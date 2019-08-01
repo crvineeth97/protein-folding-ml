@@ -5,6 +5,7 @@
 #SBATCH -n 10
 #SBATCH -N 1
 #SBATCH --gres=gpu:1
+#SBATCH -w gnode32
 #SBATCH --mem-per-cpu=4096
 #SBATCH --mem=0
 #SBATCH --time=4-00:00:00

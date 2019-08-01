@@ -1,3 +1,4 @@
+import logging
 from time import time
 
 from constants import DEVICE
@@ -6,13 +7,13 @@ from preprocessing import preprocess_raw_data
 from training import train_model
 from util import init_output_dir
 
+model = ResNet().to(DEVICE)
+init_output_dir(model)
+
 start = time()
 preprocess_raw_data()
-print("Total preprocessing time: ", time() - start)
+logging.info("Total preprocessing time: %f", time() - start)
 
-init_output_dir()
-
-model = ResNet().to(DEVICE)
 start = time()
 train_model_path = train_model(model)
-print("Total training time: ", time() - start)
+logging.info("Total training time: %f", time() - start)

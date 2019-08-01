@@ -1,3 +1,4 @@
+import logging
 from os import listdir, makedirs
 from os.path import exists
 from shutil import rmtree
@@ -28,7 +29,7 @@ def calculate_dihedral_from_points(points):
         try:
             n[i - 1] = tmp / np.linalg.norm(tmp)
         except RuntimeWarning:
-            print("M", end="")
+            logging.info("M", end="")
     m = np.cross(n[0], b[1] / np.linalg.norm(b[1]))
     x = np.dot(n[0], n[1])
     y = np.dot(m, n[1])
@@ -185,7 +186,7 @@ def read_protein(file_pointer):
                     ]
                 )
                 if len(evolutionary[-1]) != seq_len:
-                    print(
+                    logging.info(
                         "Error in evolutionary information of protein with id "
                         + id_
                         + ". Skipping it"
@@ -219,7 +220,7 @@ def read_protein(file_pointer):
                     ]
                 )
                 if len(tertiary[-1]) != 3 * seq_len:
-                    print(
+                    logging.info(
                         "Error in tertiary information of protein with id "
                         + id_
                         + ". Skipping it"
@@ -234,7 +235,7 @@ def read_protein(file_pointer):
         elif next_line == "[MASK]\n":
             mask = list([MASK_DICT[aa] for aa in file_pointer.readline()[:-1]])
             if len(mask) != seq_len:
-                print(
+                logging.info(
                     "Error in masking information of protein with id "
                     + id_
                     + ". Skipping it"
@@ -254,7 +255,7 @@ def read_protein(file_pointer):
 
 
 def process_file(input_file, output_folder, save_tertiary):
-    print("Processing raw data file", input_file)
+    logging.info("Processing raw data file", input_file)
     input_file_pointer = open("data/raw/" + input_file, "r")
     idx = 0
 
@@ -325,7 +326,7 @@ def process_file(input_file, output_folder, save_tertiary):
         if skip_flg:
             continue
 
-        # print(protein["id"])
+        # logging.info(protein["id"])
         masked_length = len(primary_masked)
         assert len(evolutionary_masked) == masked_length
         # assert len(secondary_masked) == masked_length
@@ -357,9 +358,11 @@ def process_file(input_file, output_folder, save_tertiary):
                 omega=omega,
             )
         idx += 1
+        if idx % 2000 == 0:
+            logging.info("Last: %s - %d proteins processed", protein["id"], idx)
 
     input_file_pointer.close()
-    print("Wrote output of ", idx, " proteins to ", output_folder, " folder")
+    logging.info("Wrote output of ", idx, " proteins to ", output_folder, " folder")
 
 
 def filter_input_files(input_files):
@@ -372,7 +375,7 @@ def filter_input_files(input_files):
 
 
 def preprocess_raw_data():
-    print("Starting pre-processing of raw data...")
+    logging.info("Starting pre-processing of raw data...")
 
     input_files = listdir("data/raw/")
     input_files_filtered = filter_input_files(input_files)
@@ -390,11 +393,11 @@ def preprocess_raw_data():
             else:
                 process_file(filename, preprocessed_folder_path, False)
         else:
-            print(
+            logging.info(
                 "Preprocessed files already present in",
                 preprocessed_folder_path,
                 "directory. Use --force-pre-processing-overwrite",
                 "or delete the folder manually to overwrite",
             )
 
-    print("Completed pre-processing.")
+    logging.info("Completed pre-processing.")

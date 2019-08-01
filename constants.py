@@ -10,7 +10,7 @@ MINIBATCH_SIZE = 1
 
 # Learning rate of the implemented model during training start
 # The learning rate will change while training
-LEARNING_RATE = 0.005
+LEARNING_RATE = 0.001
 
 # Print training loss every PRINT_LOSS_INTERVAL iterations
 PRINT_LOSS_INTERVAL = 100

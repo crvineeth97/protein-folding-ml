@@ -79,7 +79,7 @@ class MakeResNet(nn.Module):
         )
         self.bn1 = norm_layer(self.start_planes)
         self.relu = nn.ReLU(inplace=True)
-        self.maxpool = nn.MaxPool1d(kernel_size=3, stride=1, padding=1)
+        # self.maxpool = nn.MaxPool1d(kernel_size=3, stride=1, padding=1)
         self.layer1 = self._make_layer(64, layers[0], kernel_size)
         self.layer2 = self._make_layer(128, layers[1], kernel_size)
         self.layer3 = self._make_layer(256, layers[2], kernel_size)
@@ -129,7 +129,7 @@ class MakeResNet(nn.Module):
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
-        x = self.maxpool(x)
+        # x = self.maxpool(x)
 
         x = self.layer1(x)
         x = self.layer2(x)

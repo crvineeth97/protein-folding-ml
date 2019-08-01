@@ -13,11 +13,12 @@ from constants import (
     LEARNING_RATE,
     MINIBATCH_SIZE,
     PREPROCESS_PROTEIN_WITH_MISSING_RESIDUES,
+    PRINT_LOSS_INTERVAL,
     TRAINING_EPOCHS,
 )
 
 
-def init_output_dir():
+def init_output_dir(model):
     model_dir = datetime.now().strftime("%Y-%m-%d %H_%M_%S")
     globals().__setitem__("experiment_id", model_dir)
     model_dir = "output/" + model_dir + "/"
@@ -31,14 +32,17 @@ def init_output_dir():
         level=logging.INFO,
         handlers=handlers,
     )
-    logging.info("MINIBATCH_SIZE: %d", MINIBATCH_SIZE)
-    logging.info("LEARNING_RATE: %f", LEARNING_RATE)
-    logging.info("TRAINING_EPOCHS: %d", TRAINING_EPOCHS)
-    logging.info("EVAL_INTERVAL: %d", EVAL_INTERVAL)
-    logging.info(
-        "PREPROCESS_PROTEIN_WITH_MISSING_RESIDUES: %s", str(PREPROCESS_PROTEIN_WITH_MISSING_RESIDUES)
-    )
     logging.info("DEVICE: %s", DEVICE)
+    logging.info("EVAL_INTERVAL: %d", EVAL_INTERVAL)
+    logging.info("LEARNING_RATE: %f", LEARNING_RATE)
+    logging.info("MINIBATCH_SIZE: %d", MINIBATCH_SIZE)
+    logging.info(
+        "PREPROCESS_PROTEIN_WITH_MISSING_RESIDUES: %s",
+        str(PREPROCESS_PROTEIN_WITH_MISSING_RESIDUES),
+    )
+    logging.info("PRINT_LOSS_INTERVAL: %f", PRINT_LOSS_INTERVAL)
+    logging.info("TRAINING_EPOCHS: %d", TRAINING_EPOCHS)
+    logging.info(model)
 
 
 def write_model_to_disk(model):
