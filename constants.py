@@ -10,16 +10,16 @@ MINIBATCH_SIZE = 1
 
 # Learning rate of the implemented model during training start
 # The learning rate will change while training
-LEARNING_RATE = 0.01
+LEARNING_RATE = 0.005
 
 # Print training loss every PRINT_LOSS_INTERVAL iterations
 PRINT_LOSS_INTERVAL = 100
 
 # Number of times to go through the dataset while training
-TRAINING_EPOCHS = 1000
+TRAINING_EPOCHS = 10
 
 # Evaluate model on validation set every n minibatches
-EVAL_INTERVAL = 5000
+EVAL_INTERVAL = 2000
 
 # List of amino acids and their integer representation
 AA_ID_DICT = {
@@ -56,7 +56,7 @@ MASK_DICT = {"-": 0, "+": 1}
 FORCE_PREPROCESSING_OVERWRITE = False
 
 # Hide the visualizaiton of the training
-HIDE_UI = False
+HIDE_UI = True
 
 # If set to True, preprocess proteins that have missing residues in the middle
 PREPROCESS_PROTEIN_WITH_MISSING_RESIDUES = False

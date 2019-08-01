@@ -63,7 +63,13 @@ def validate_model(model, criterion):
             # The following will be of size [Batch, Length]
             pred_phi = torch.atan2(output[:, 0, :], output[:, 1, :]).unsqueeze(1)
             pred_psi = torch.atan2(output[:, 2, :], output[:, 3, :]).unsqueeze(1)
-            pred_omega = torch.atan2(output[:, 4, :], output[:, 5, :]).unsqueeze(1)
+            # pred_omega = torch.atan2(output[:, 4, :], output[:, 5, :]).unsqueeze(1)
+            pred_omega = torch.zeros(
+                MINIBATCH_SIZE, 1, lengths[0], device=DEVICE, dtype=torch.float32
+            )
+            for i in range(MINIBATCH_SIZE):
+                om = torch.from_numpy(act_omega[i] * np.pi / 180.0)
+                pred_omega[i, 0, : lengths[i]] = om
             # dihedrals will be converted from [Batch, 3, length]
             # [Length, Batch, 3] as this is the input
             # required by pnerf functions
@@ -117,9 +123,9 @@ def train_model(model):
             lengths, primary, evolutionary, act_phi, act_psi, act_omega = data
             # inp should be of shape [Batch, 41, Max_length]
             inp = model.generate_input(lengths, primary, evolutionary)
-            # target should be of shape [Batch, 6, Max_length]
+            # target should be of shape [Batch, 4, Max_length]
             target = model.generate_target(lengths, act_phi, act_psi, act_omega)
-            # output should be of shape [Batch, 6, Max_length]
+            # output should be of shape [Batch, 4, Max_length]
             # sin(phi), cos(phi), sin(psi), cos(psi), sin(omega), cos(omega)
             output = model(inp)
             loss = model.calculate_loss(lengths, criterion, output, target)

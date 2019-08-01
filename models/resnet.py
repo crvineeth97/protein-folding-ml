@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from numpy import pi
+import numpy as np
 
 from constants import DEVICE, MINIBATCH_SIZE
 from models.resnet_1d import resnet34
@@ -11,7 +11,7 @@ class ResNet(nn.Module):
         super(ResNet, self).__init__()
         self.reslay = resnet34()
         self.fc1 = nn.Linear(512, 64)
-        self.fc2 = nn.Linear(64, 6)
+        self.fc2 = nn.Linear(64, 4)
 
     def generate_input(self, lengths, primary, evolutionary):
         """
@@ -51,18 +51,18 @@ class ResNet(nn.Module):
     def generate_target(self, lengths, phi, psi, omega):
         # dihedrals are in degrees
         target = torch.zeros(
-            MINIBATCH_SIZE, 6, lengths[0], device=DEVICE, dtype=torch.float32
+            MINIBATCH_SIZE, 4, lengths[0], device=DEVICE, dtype=torch.float32
         )
         for i in range(MINIBATCH_SIZE):
-            ph = torch.from_numpy(phi[i] * pi / 180.0)
-            ps = torch.from_numpy(psi[i] * pi / 180.0)
-            om = torch.from_numpy(omega[i] * pi / 180.0)
+            ph = torch.from_numpy(phi[i] * np.pi / 180.0)
+            ps = torch.from_numpy(psi[i] * np.pi / 180.0)
+            # om = torch.from_numpy(omega[i] * np.pi / 180.0)
             target[i, 0, : lengths[i]] = torch.sin(ph)
             target[i, 1, : lengths[i]] = torch.cos(ph)
             target[i, 2, : lengths[i]] = torch.sin(ps)
             target[i, 3, : lengths[i]] = torch.cos(ps)
-            target[i, 4, : lengths[i]] = torch.sin(om)
-            target[i, 5, : lengths[i]] = torch.cos(om)
+            # target[i, 4, : lengths[i]] = torch.sin(om)
+            # target[i, 5, : lengths[i]] = torch.cos(om)
         return target
 
     def calculate_loss(self, lengths, criterion, output, target):
