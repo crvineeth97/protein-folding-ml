@@ -140,24 +140,16 @@ class MakeResNet(nn.Module):
 
 
 def resnet18(**kwargs):
-    """Constructs a ResNet-18 model.
-    """
     return MakeResNet([2, 2, 2, 2], [17, 17], **kwargs)
 
 
 def resnet34(**kwargs):
-    """Constructs a ResNet-34 model.
-    """
     return MakeResNet([3, 4, 6, 3], [17, 17], **kwargs)
 
 
 def resnet66(**kwargs):
-    """Constructs a ResNet-66 model.
-    """
     return MakeResNet([3, 8, 18, 3], [17, 17], **kwargs)
 
 
 def resnet98(**kwargs):
-    """Constructs a ResNet-66 model.
-    """
     return MakeResNet([3, 12, 30, 3], [17, 17], **kwargs)

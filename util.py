@@ -53,6 +53,12 @@ def init_output_dir(model):
     logging.info(model)
 
 
+def get_model_dir():
+    model_dir = globals().__getitem__("experiment_id")
+    model_dir = "output/" + model_dir + "/"
+    return model_dir
+
+
 def write_model_to_disk(model, name):
     path = "output/" + globals().get("experiment_id") + "/" + name + ".model"
     torch.save(model, path)

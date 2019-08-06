@@ -15,7 +15,7 @@ from constants import (
     VALIDATION_FOLDER,
 )
 from dataloader import contruct_dataloader_from_disk
-from util import calc_rmsd, write_model_to_disk
+from util import calc_rmsd, write_model_to_disk, get_model_dir
 from visualize import Visualizer
 
 
@@ -92,8 +92,10 @@ def train_model(model, criterion, optimizer):
     best_rmsd = 1e20
     visualize = None
     training_set_iter = 0
+    epoch_train_loss = 0
 
     while training_set_iter < TRAINING_EPOCHS:
+        epoch_train_loss = 0
         running_train_loss = 0
         for i, data in enumerate(train_loader):
             # data is a tuple of tuple of numpy arrays except
@@ -111,6 +113,7 @@ def train_model(model, criterion, optimizer):
             output = model(inp)
             loss = model.calculate_loss(lengths, criterion, output, target)
             running_train_loss += loss.item()
+            epoch_train_loss += loss.item()
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -141,8 +144,17 @@ def train_model(model, criterion, optimizer):
                         pred_phi, pred_psi, act_phi[0], act_psi[0]
                     )
                 logging.info("\tValidation loss: %.10lf, RMSD: %.10lf", val_loss, rmsd)
+        logging.info("Epoch train loss: %.10lf", epoch_train_loss)
         write_model_to_disk(model, "latest")
         training_set_iter += 1
+
+    with open(get_model_dir() + "summary.txt", "a") as f:
+        f.write("Number of epochs: " + str(training_set_iter) + "\n")
+        f.write("Latest epoch train loss: " + str(epoch_train_loss) + "\n")
+        f.write("Best model validation loss: " + str(best_model_val_loss) + "\n")
+        f.write("Best model RMSD: " + str(best_model_rmsd) + "\n")
+        f.write("Best RMSD: " + str(best_rmsd) + "\n")
+
     logging.info("Best model validation loss: %.10lf", best_model_val_loss)
     logging.info("Best model RMSD: %.10lf", best_model_rmsd)
     logging.info("Best RMSD: %.10lf", best_rmsd)

@@ -8,6 +8,7 @@ from constants import MINIBATCH_SIZE, TESTING_FOLDER
 from dataloader import contruct_dataloader_from_disk
 from preprocessing import filter_input_files
 from visualize import Visualizer
+from util import get_model_dir
 
 
 def compute_mae(lengths, pred, act):
@@ -54,6 +55,11 @@ def test_model(model, criterion, sleep_time=0):
     logging.info("Testing loss: %f", loss)
     logging.info("Phi MAE: %f", phi_mae)
     logging.info("Psi MAE: %f", psi_mae)
+
+    with open(get_model_dir() + "summary.txt", "a") as f:
+        f.write("Testing loss: " + str(loss) + "\n")
+        f.write("Phi MAE: " + str(phi_mae) + "\n")
+        f.write("Psi MAE: " + str(psi_mae) + "\n")
 
 
 if __name__ == "__main__":
