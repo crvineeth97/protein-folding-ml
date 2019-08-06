@@ -144,6 +144,7 @@ def train_model(model, criterion, optimizer):
                         pred_phi, pred_psi, act_phi[0], act_psi[0]
                     )
                 logging.info("\tValidation loss: %.10lf, RMSD: %.10lf", val_loss, rmsd)
+        epoch_train_loss /= train_size
         logging.info("Epoch train loss: %.10lf", epoch_train_loss)
         write_model_to_disk(model, "latest")
         training_set_iter += 1

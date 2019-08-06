@@ -21,6 +21,10 @@ criterion = torch.nn.MSELoss()
 # TODO Try various options of Adam
 optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
 init_output_dir(model)
+total_params = sum(p.numel() for p in model.parameters())
+train_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+logging.info("Total number of parameters: %d", total_params)
+logging.info("Number of trainable parameters: %d", train_params)
 
 start = time()
 preprocess_raw_data()
@@ -31,8 +35,6 @@ train_model(model, criterion, optimizer)
 train_time = str(datetime.timedelta(seconds=time() - start))
 logging.info("Total training time: %s", train_time)
 
-total_params = sum(p.numel() for p in model.parameters())
-train_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
 with open(get_model_dir() + "summary.txt", "a") as f:
     f.write("Training time: " + train_time)
     f.write("Total number of parameters: " + str(total_params) + "\n")

@@ -2,13 +2,13 @@ import torch
 import torch.nn as nn
 
 from constants import DEVICE, MINIBATCH_SIZE
-from models.resnet_1d import resnet18
+from models.resnet_1d import resnet6
 
 
 class ResNet(nn.Module):
     def __init__(self):
         super(ResNet, self).__init__()
-        self.reslay = resnet18()
+        self.reslay = resnet6()
         self.fc1 = nn.Linear(512, 64)
         self.fc2 = nn.Linear(64, 4)
 
@@ -81,7 +81,7 @@ class ResNet(nn.Module):
         output = nn.functional.relu_(output)
         # [Batch, Max_length, 64)]
         output = self.fc2(output)
-        output = nn.functional.hardtanh_(output)
+        output = nn.functional.tanh(output)
         # [Batch, Max_length, 4)]
         output = output.transpose(1, 2)
         # [Batch, 4, Max_length]

@@ -49,8 +49,8 @@ class BasicBlock(nn.Module):
         else:
             identity = x
 
-        out += identity
         out = self.relu(out)
+        out += identity
 
         return out
 
@@ -137,6 +137,14 @@ class MakeResNet(nn.Module):
         x = self.layer4(x)
 
         return x
+
+
+def resnet6(**kwargs):
+    return MakeResNet([1, 1, 1, 1], [3, 3], **kwargs)
+
+
+def resnet14(**kwargs):
+    return MakeResNet([1, 2, 2, 1], [17, 17], **kwargs)
 
 
 def resnet18(**kwargs):
