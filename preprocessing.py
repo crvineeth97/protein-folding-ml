@@ -59,7 +59,7 @@ def calculate_phi_from_masked_tertiary(tertiary_masked):
         points[0] = tertiary_masked[i - 1][6:]
         points[1:] = np.reshape(aa, (3, 3))
         phi.append(calculate_dihedral_from_points(points))
-    return np.array(phi, dtype=np.float32) * 180.0 / np.pi
+    return np.array(phi, dtype=np.float32)
 
 
 def calculate_psi_from_masked_tertiary(tertiary_masked):
@@ -86,7 +86,7 @@ def calculate_psi_from_masked_tertiary(tertiary_masked):
         points[:3] = np.reshape(aa, (3, 3))
         points[3] = tertiary_masked[i + 1][:3]
         psi.append(calculate_dihedral_from_points(points))
-    return np.array(psi, dtype=np.float32) * 180.0 / np.pi
+    return np.array(psi, dtype=np.float32)
 
 
 def calculate_omega_from_masked_tertiary(tertiary_masked):
@@ -113,7 +113,7 @@ def calculate_omega_from_masked_tertiary(tertiary_masked):
         points[0:2] = np.reshape(aa[3:], (2, 3))
         points[2:] = np.reshape(tertiary_masked[i + 1][:6], (2, 3))
         omega.append(calculate_dihedral_from_points(points))
-    return np.array(omega, dtype=np.float32) * 180.0 / np.pi
+    return np.array(omega, dtype=np.float32)
 
 
 def masked_select(data, mask, X=None):
@@ -252,7 +252,7 @@ def read_protein(file_pointer):
 
 
 def process_file(input_file, output_folder, save_tertiary):
-    logging.info("Processing raw data file", input_file)
+    logging.info("Processing raw data file %s", input_file)
     input_file_pointer = open("data/raw/" + input_file, "r")
     idx = 0
 
@@ -355,7 +355,7 @@ def process_file(input_file, output_folder, save_tertiary):
                 omega=omega,
             )
         idx += 1
-        if idx % 2000 == 0:
+        if idx % 1000 == 0:
             logging.info("Last: %s - %d proteins processed", protein["id"], idx)
 
     input_file_pointer.close()

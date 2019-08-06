@@ -24,8 +24,9 @@ def init_output_dir(model):
     model_dir = "output/" + model_dir + "/"
     os.makedirs(model_dir)
     os.makedirs(model_dir + "code/")
+    # Keep a copy of .sh and .py files in the model's code
     os.system(
-        "rsync -ar --include='*/' --include='*\.py' "
+        "rsync -mar --include='*/' --include='*\.py' "
         + "--include='*\.sh' --exclude='*' ./ "
         + "\ ".join(model_dir.split(" "))
         + "code/"

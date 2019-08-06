@@ -49,7 +49,7 @@ def calculate_phi_from_masked_tertiary(tertiary_masked):
         points[0] = tertiary_masked[i - 1][6:]
         points[1:] = np.reshape(aa, (3, 3))
         phi.append(calculate_dihedral_from_points(points))
-    return np.array(phi, dtype=np.float32) * 180.0 / np.pi
+    return np.array(phi, dtype=np.float32)
 
 
 def calculate_psi_from_masked_tertiary(tertiary_masked):
@@ -76,7 +76,7 @@ def calculate_psi_from_masked_tertiary(tertiary_masked):
         points[0:3] = np.reshape(aa, (3, 3))
         points[3] = tertiary_masked[i + 1][:3]
         psi.append(calculate_dihedral_from_points(points))
-    return np.array(psi, dtype=np.float32) * 180.0 / np.pi
+    return np.array(psi, dtype=np.float32)
 
 
 def calculate_omega_from_masked_tertiary(tertiary_masked):
@@ -103,7 +103,7 @@ def calculate_omega_from_masked_tertiary(tertiary_masked):
         points[0:2] = np.reshape(aa[3:], (2, 3))
         points[2:] = np.reshape(tertiary_masked[i + 1][:6], (2, 3))
         omega.append(calculate_dihedral_from_points(points))
-    return np.array(omega, dtype=np.float32) * 180.0 / np.pi
+    return np.array(omega, dtype=np.float32)
 
 
 def get_backbone_coords(pdb_id):

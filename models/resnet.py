@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-import numpy as np
 
 from constants import DEVICE, MINIBATCH_SIZE
 from models.resnet_1d import resnet98
@@ -49,14 +48,14 @@ class ResNet(nn.Module):
         return torch.cat((transformed_primary, transformed_evolutionary), dim=1)
 
     def generate_target(self, lengths, phi, psi, omega):
-        # dihedrals are in degrees
+        # dihedrals are in radians
         target = torch.zeros(
             MINIBATCH_SIZE, 4, lengths[0], device=DEVICE, dtype=torch.float32
         )
         for i in range(MINIBATCH_SIZE):
-            ph = torch.from_numpy(phi[i] * np.pi / 180.0)
-            ps = torch.from_numpy(psi[i] * np.pi / 180.0)
-            # om = torch.from_numpy(omega[i] * np.pi / 180.0)
+            ph = torch.from_numpy(phi[i])
+            ps = torch.from_numpy(psi[i])
+            # om = torch.from_numpy(omega[i])
             target[i, 0, : lengths[i]] = torch.sin(ph)
             target[i, 1, : lengths[i]] = torch.cos(ph)
             target[i, 2, : lengths[i]] = torch.sin(ps)

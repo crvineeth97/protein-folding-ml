@@ -1,6 +1,5 @@
 import logging
 
-import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
@@ -9,7 +8,6 @@ from constants import (
     DEVICE,
     EVAL_INTERVAL,
     HIDE_UI,
-    LEARNING_RATE,
     MINIBATCH_SIZE,
     PRINT_LOSS_INTERVAL,
     TRAINING_EPOCHS,
@@ -18,20 +16,7 @@ from constants import (
 )
 from dataloader import contruct_dataloader_from_disk
 from util import calc_rmsd, write_model_to_disk
-
-
-def init_plot():
-    plt.ion()
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    plt.title("Ramachandran plot")
-    ticks = np.arange(-180, 181, 30)
-    ax.set_xticks(ticks)
-    ax.set_yticks(ticks)
-    ax.grid(which="both")
-    ax.set_ylabel("Psi")
-    ax.set_xlabel("Phi", color="black")
-    return fig, ax
+from visualize import Visualizer
 
 
 def transform_tertiary(lengths, tertiary):
@@ -68,8 +53,7 @@ def validate_model(model, criterion):
                 MINIBATCH_SIZE, 1, lengths[0], device=DEVICE, dtype=torch.float32
             )
             for i in range(MINIBATCH_SIZE):
-                om = torch.from_numpy(act_omega[i] * np.pi / 180.0)
-                pred_omega[i, 0, : lengths[i]] = om
+                pred_omega[i, 0, : lengths[i]] = torch.from_numpy(act_omega[i])
             # dihedrals will be converted from [Batch, 3, length]
             # [Length, Batch, 3] as this is the input
             # required by pnerf functions
@@ -90,6 +74,7 @@ def validate_model(model, criterion):
             actual_coords = (
                 transform_tertiary(lengths, tertiary).contiguous().view(-1, 3)
             )
+            # TODO Improve RMSD calculation
             rmsd += calc_rmsd(predicted_coords, actual_coords)
             # drmsd += calc_drmsd(predicted_coords, actual_coords)
         rmsd /= val_size
@@ -98,27 +83,24 @@ def validate_model(model, criterion):
     return val_size, loss.item(), rmsd
 
 
-def train_model(model):
+def train_model(model, criterion, optimizer):
     train_loader = contruct_dataloader_from_disk(TRAINING_FOLDER)
     train_size = len(train_loader.dataset)
-    # TODO Try various options of Adam
-    optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
-    criterion = torch.nn.MSELoss()
 
     best_model_val_loss = 1e20
-    is_plt_initialized = False
+    best_model_rmsd = 1e20
+    best_rmsd = 1e20
+    visualize = None
     training_set_iter = 0
 
     while training_set_iter < TRAINING_EPOCHS:
-        pred_line = None
-        act_line = None
         running_train_loss = 0
         for i, data in enumerate(train_loader):
             # data is a tuple of tuple of numpy arrays except
             # lengths, which is a tuple of ints
             # Implies primary will be a tuple with MINIBATCH_SIZE number of elements
             # And each element will be of shape (Length,)
-            # phi, psi and omega are in degrees here
+            # phi, psi and omega are in radians here
             lengths, primary, evolutionary, act_phi, act_psi, act_omega = data
             # inp should be of shape [Batch, 41, Max_length]
             inp = model.generate_input(lengths, primary, evolutionary)
@@ -143,26 +125,24 @@ def train_model(model):
 
             if (i + 1) % EVAL_INTERVAL == 0:
                 val_size, val_loss, rmsd = validate_model(model, criterion)
+                if rmsd < best_rmsd:
+                    best_rmsd = rmsd
                 if val_loss < best_model_val_loss:
                     best_model_val_loss = val_loss
+                    best_model_rmsd = rmsd
                     write_model_to_disk(model, "best")
                 if not HIDE_UI:
                     output = output.detach().cpu().numpy()[0]
-                    pred_phi = np.arctan2(output[0, :], output[1, :]) * 180.0 / np.pi
-                    pred_psi = np.arctan2(output[2, :], output[3, :]) * 180.0 / np.pi
-                    if not is_plt_initialized:
-                        fig, ax = init_plot()
-                        pred_line, act_line, = ax.plot(
-                            pred_phi, pred_psi, "ro", act_phi[0], act_psi[0], "bo"
-                        )
-                        is_plt_initialized = True
-                    else:
-                        pred_line.set_xdata(pred_phi)
-                        pred_line.set_ydata(pred_psi)
-                        act_line.set_xdata(act_phi[0])
-                        act_line.set_ydata(act_psi[0])
-                        fig.canvas.draw()
-                        fig.canvas.flush_events()
+                    pred_phi = np.arctan2(output[0, :], output[1, :])
+                    pred_psi = np.arctan2(output[2, :], output[3, :])
+                    if not visualize:
+                        visualize = Visualizer()
+                    visualize.plot_ramachandran(
+                        pred_phi, pred_psi, act_phi[0], act_psi[0]
+                    )
                 logging.info("\tValidation loss: %.10lf, RMSD: %.10lf", val_loss, rmsd)
         write_model_to_disk(model, "latest")
         training_set_iter += 1
+    logging.info("Best model validation loss: %.10lf", best_model_val_loss)
+    logging.info("Best model RMSD: %.10lf", best_model_rmsd)
+    logging.info("Best RMSD: %.10lf", best_rmsd)
