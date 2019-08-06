@@ -4,7 +4,7 @@ from os import listdir
 import numpy as np
 import torch
 
-from constants import MINIBATCH_SIZE, TESTING_FOLDER
+from constants import MINIBATCH_SIZE, TESTING_FOLDER, HIDE_UI
 from dataloader import contruct_dataloader_from_disk
 from preprocessing import filter_input_files
 from visualize import Visualizer
@@ -46,9 +46,10 @@ def test_model(model, criterion, sleep_time=0):
             pred_psi = np.arctan2(output[:, 2, :], output[:, 3, :])
             phi_mae += compute_mae(lengths, pred_phi, act_phi)
             psi_mae += compute_mae(lengths, pred_psi, act_psi)
-            visualize.plot_ramachandran(
-                pred_phi[0], pred_psi[0], act_phi[0], act_psi[0]
-            )
+            if not HIDE_UI:
+                visualize.plot_ramachandran(
+                    pred_phi[0], pred_psi[0], act_phi[0], act_psi[0]
+                )
         loss /= test_size
         phi_mae /= test_size
         psi_mae /= test_size

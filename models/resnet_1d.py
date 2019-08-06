@@ -25,7 +25,7 @@ class BasicBlock(nn.Module):
             bias=False,
         )
         self.bn1 = norm_layer(out_channels)
-        self.relu = nn.ReLU(inplace=True)
+        self.relu = nn.ReLU()
         self.conv2 = nn.Conv1d(
             in_channels=out_channels,
             out_channels=out_channels,
