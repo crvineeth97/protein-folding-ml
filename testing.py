@@ -1,14 +1,15 @@
 import logging
+import time
 from os import listdir
 
 import numpy as np
 import torch
 
-from constants import MINIBATCH_SIZE, TESTING_FOLDER, HIDE_UI
+from constants import HIDE_UI, MINIBATCH_SIZE, TESTING_FOLDER
 from dataloader import contruct_dataloader_from_disk
 from preprocessing import filter_input_files
-from visualize import Visualizer
 from util import get_model_dir
+from visualize import Visualizer
 
 
 def compute_mae(lengths, pred, act):
@@ -24,7 +25,7 @@ def compute_mae(lengths, pred, act):
     return mae
 
 
-def test_model(model, criterion, sleep_time=0):
+def test_model(model, criterion, model_dir=None, sleep_time=0):
     visualize = Visualizer()
     loss = 0
     phi_mae = 0
@@ -50,14 +51,24 @@ def test_model(model, criterion, sleep_time=0):
                 visualize.plot_ramachandran(
                     pred_phi[0], pred_psi[0], act_phi[0], act_psi[0]
                 )
+                time.sleep(sleep_time)
         loss /= test_size
         phi_mae /= test_size
         psi_mae /= test_size
-    logging.info("Testing loss: %f", loss)
-    logging.info("Phi MAE: %f", phi_mae)
-    logging.info("Psi MAE: %f", psi_mae)
 
-    with open(get_model_dir() + "summary.txt", "a") as f:
+    if model_dir:
+        from sys import stdout
+
+        write_to = "output/" + model_dir + "/testing.txt"
+        logging.basicConfig(stream=stdout, level=logging.INFO)
+    else:
+        write_to = get_model_dir() + "summary.txt"
+
+    logging.info("Testing loss: %.10lf", loss)
+    logging.info("Phi MAE: %.10lf", phi_mae)
+    logging.info("Psi MAE: %.10lf", psi_mae)
+
+    with open(write_to, "a") as f:
         f.write("Testing loss: " + str(loss) + "\n")
         f.write("Phi MAE: " + str(phi_mae) + "\n")
         f.write("Psi MAE: " + str(psi_mae) + "\n")
@@ -71,4 +82,4 @@ if __name__ == "__main__":
         print("Testing model " + model_dir)
         model_path = "output/" + model_dir + "/best.model"
         model = torch.load(model_path, map_location={"cuda:0": "cpu"})
-        test_model(model, criterion, 5)
+        test_model(model, criterion, model_dir, 1)

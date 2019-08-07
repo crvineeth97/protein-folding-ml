@@ -16,7 +16,7 @@ LEARNING_RATE = 0.001
 PRINT_LOSS_INTERVAL = 100
 
 # Number of times to go through the dataset while training
-TRAINING_EPOCHS = 10
+TRAINING_EPOCHS = 5
 
 # Evaluate model on validation set every n minibatches
 EVAL_INTERVAL = 2000
