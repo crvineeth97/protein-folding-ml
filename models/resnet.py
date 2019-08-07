@@ -71,18 +71,22 @@ class ResNet(nn.Module):
         loss /= MINIBATCH_SIZE
         return loss
 
-    def forward(self, input):
-        # [Batch, 41, Max_length]
+    def forward(self, input, lengths):
+        # [Batch, 41, Max_length] -> [Batch, 512, Max_length]
         output = self.reslay(input)
-        # [Batch, 512, Max_length]
+
+        # [Batch, 512, Max_length] -> [Batch * Max_length, 512]
         output = output.transpose(1, 2)
-        # [Batch, Max_length, 512]
+        output = output.contiguous().view(-1, output.shape[2])
+
+        # Run through linear and activation layers
         output = self.fc1(output)
         output = torch.tanh(output)
-        # [Batch, Max_length, 64)]
         # output = self.fc2(output)
         # output = torch.tanh(output)
-        # [Batch, Max_length, 4)]
+
+        # [Batch * Max_length, 4] -> [Batch, 4, Max_length]
+        output = output.view(MINIBATCH_SIZE, lengths[0], 4)
         output = output.transpose(1, 2)
-        # [Batch, 4, Max_length]
+
         return output

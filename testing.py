@@ -39,7 +39,7 @@ def test_model(model, criterion, model_dir=None, sleep_time=0):
             inp = model.generate_input(lengths, primary, evolutionary)
             # Doesn't require gradients to go backwards, hence detach the output
             target = model.generate_target(lengths, act_phi, act_psi, act_omega)
-            output = model(inp)
+            output = model(inp, lengths)
             loss += model.calculate_loss(lengths, criterion, output, target).item()
             # The following will be of size [Batch, Length]
             output = output.cpu().numpy()

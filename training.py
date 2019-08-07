@@ -43,7 +43,7 @@ def validate_model(model, criterion):
             inp = model.generate_input(lengths, primary, evolutionary)
             # Doesn't require gradients to go backwards, hence detach the output
             target = model.generate_target(lengths, act_phi, act_psi, act_omega)
-            output = model(inp)
+            output = model(inp, lengths)
             loss += model.calculate_loss(lengths, criterion, output, target)
             # The following will be of size [Batch, Length]
             pred_phi = torch.atan2(output[:, 0, :], output[:, 1, :]).unsqueeze(1)
@@ -110,7 +110,7 @@ def train_model(model, criterion, optimizer):
             target = model.generate_target(lengths, act_phi, act_psi, act_omega)
             # output should be of shape [Batch, 4, Max_length]
             # sin(phi), cos(phi), sin(psi), cos(psi), sin(omega), cos(omega)
-            output = model(inp)
+            output = model(inp, lengths)
             loss = model.calculate_loss(lengths, criterion, output, target)
             running_train_loss += loss.item()
             epoch_train_loss += loss.item()
