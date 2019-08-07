@@ -33,11 +33,11 @@ def transform_tertiary(lengths, tertiary):
 
 def validate_model(model, criterion):
     validation_loader = contruct_dataloader_from_disk(VALIDATION_FOLDER)
-    val_size = len(validation_loader.dataset)
     rmsd = 0
     loss = 0
+    batch_iter = 0
     with torch.no_grad():
-        for i, data in enumerate(validation_loader):
+        for _, data in enumerate(validation_loader):
             # Tertiary is [Batch, Length, 9]
             lengths, primary, evolutionary, act_phi, act_psi, act_omega, tertiary = data
             inp = model.generate_input(lengths, primary, evolutionary)
@@ -52,8 +52,8 @@ def validate_model(model, criterion):
             pred_omega = torch.zeros(
                 MINIBATCH_SIZE, 1, lengths[0], device=DEVICE, dtype=torch.float32
             )
-            for i in range(MINIBATCH_SIZE):
-                pred_omega[i, 0, : lengths[i]] = torch.from_numpy(act_omega[i])
+            for j in range(MINIBATCH_SIZE):
+                pred_omega[j, 0, : lengths[j]] = torch.from_numpy(act_omega[j])
             # dihedrals will be converted from [Batch, 3, length]
             # [Length, Batch, 3] as this is the input
             # required by pnerf functions
@@ -70,17 +70,17 @@ def validate_model(model, criterion):
                 )
                 / 100
             )
-            predicted_coords = coordinates.transpose(0, 1).contiguous().view(-1, 3)
-            actual_coords = (
-                transform_tertiary(lengths, tertiary).contiguous().view(-1, 3)
-            )
+            predicted_coords = coordinates.transpose(0, 1)
+            actual_coords = transform_tertiary(lengths, tertiary)
             # TODO Improve RMSD calculation
-            rmsd += calc_rmsd(predicted_coords, actual_coords)
+            rmsd += calc_rmsd(predicted_coords, actual_coords, lengths)
             # drmsd += calc_drmsd(predicted_coords, actual_coords)
-        rmsd /= val_size
-        loss /= val_size
-        # drmsd /= val_size
-    return val_size, loss.item(), rmsd
+            batch_iter += 1
+
+        rmsd /= batch_iter
+        loss /= batch_iter
+        # drmsd /= batch_iter
+    return loss.item(), rmsd
 
 
 def train_model(model, criterion, optimizer):
@@ -97,7 +97,7 @@ def train_model(model, criterion, optimizer):
     while training_set_iter < TRAINING_EPOCHS:
         epoch_train_loss = 0
         running_train_loss = 0
-        for i, data in enumerate(train_loader):
+        for batch_iter, data in enumerate(train_loader):
             # data is a tuple of tuple of numpy arrays except
             # lengths, which is a tuple of ints
             # Implies primary will be a tuple with MINIBATCH_SIZE number of elements
@@ -117,17 +117,17 @@ def train_model(model, criterion, optimizer):
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            if (i + 1) % PRINT_LOSS_INTERVAL == 0:
+            if batch_iter % PRINT_LOSS_INTERVAL == 0:
                 logging.info(
                     "[%d|%.2f%%] Train loss: %.10lf",
                     training_set_iter,
-                    (i / train_size) * 100,
+                    (batch_iter * MINIBATCH_SIZE / train_size) * 100,
                     running_train_loss / PRINT_LOSS_INTERVAL,
                 )
                 running_train_loss = 0
 
-            if (i + 1) % EVAL_INTERVAL == 0:
-                val_size, val_loss, rmsd = validate_model(model, criterion)
+            if batch_iter % EVAL_INTERVAL == 0:
+                val_loss, rmsd = validate_model(model, criterion)
                 if rmsd < best_rmsd:
                     best_rmsd = rmsd
                 if val_loss < best_model_val_loss:

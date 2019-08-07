@@ -6,20 +6,20 @@ from torch.cuda import is_available
 # The padded 0s of the proteins that aren't of maximum length
 # won't be 0 in the output. Can manually make it 0 before back
 # prop, but not sure how effective it will be
-MINIBATCH_SIZE = 1
+MINIBATCH_SIZE = 100
 
 # Learning rate of the implemented model during training start
 # The learning rate will change while training
 LEARNING_RATE = 0.001
 
-# Print training loss every PRINT_LOSS_INTERVAL iterations
-PRINT_LOSS_INTERVAL = 100
+# Print training loss every PRINT_LOSS_INTERVAL batch iterations
+PRINT_LOSS_INTERVAL = 1
 
 # Number of times to go through the dataset while training
 TRAINING_EPOCHS = 5
 
-# Evaluate model on validation set every n minibatches
-EVAL_INTERVAL = 2000
+# Evaluate model on validation set every EVAL_INTERVAL minibatches
+EVAL_INTERVAL = 4
 
 # List of amino acids and their integer representation
 AA_ID_DICT = {

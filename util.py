@@ -26,8 +26,8 @@ def init_output_dir(model):
     os.makedirs(model_dir + "code/")
     # Keep a copy of .sh and .py files in the model's code
     os.system(
-        "rsync -mar --include='*/' --include='*\.py' "
-        + "--include='*\.sh' --exclude='*' --exclude='./output/*' ./ "
+        "rsync -mar --exclude='output' --include='*/' "
+        + "--include='*\.py' --include='*\.sh' --exclude='*' ./ "
         + "\ ".join(model_dir.split(" "))
         + "code/"
     )
@@ -93,23 +93,28 @@ def transpose_atoms_to_center_of_mass(x):
     return x - centerOfMass
 
 
-def calc_rmsd(chain_a, chain_b):
-    # move to center of mass
-    a = chain_a.cpu().numpy().transpose()
-    b = chain_b.cpu().numpy().transpose()
-    X = transpose_atoms_to_center_of_mass(a)
-    Y = transpose_atoms_to_center_of_mass(b)
+def calc_rmsd(chain_a, chain_b, lengths):
+    chain_a = chain_a.cpu().numpy()
+    chain_b = chain_b.cpu().numpy()
+    RMSD = 0
+    for i in range(MINIBATCH_SIZE):
+        a = chain_a[i, : lengths[i]].transpose()
+        b = chain_b[i, : lengths[i]].transpose()
+        # move to center of mass
+        X = transpose_atoms_to_center_of_mass(a)
+        Y = transpose_atoms_to_center_of_mass(b)
 
-    R = np.matmul(Y, X.transpose())
-    # extract the singular values
-    _, S, _ = np.linalg.svd(R)
-    # compute RMSD using the formula
-    E0 = sum(
-        list(np.linalg.norm(x) ** 2 for x in X.transpose())
-        + list(np.linalg.norm(x) ** 2 for x in Y.transpose())
-    )
-    TraceS = sum(S)
-    RMSD = np.sqrt((1 / len(X.transpose())) * (E0 - 2 * TraceS))
+        R = np.matmul(Y, X.transpose())
+        # extract the singular values
+        _, S, _ = np.linalg.svd(R)
+        # compute RMSD using the formula
+        E0 = sum(
+            list(np.linalg.norm(x) ** 2 for x in X.transpose())
+            + list(np.linalg.norm(x) ** 2 for x in Y.transpose())
+        )
+        TraceS = sum(S)
+        RMSD += np.sqrt((1 / len(X.transpose())) * (E0 - 2 * TraceS))
+    RMSD /= MINIBATCH_SIZE
     return RMSD
 
 
