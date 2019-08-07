@@ -9,8 +9,10 @@ class ResNet(nn.Module):
     def __init__(self):
         super(ResNet, self).__init__()
         self.reslay = resnet6()
-        self.fc1 = nn.Linear(512, 4)
-        # self.fc2 = nn.Linear(64, 4)
+        self.fc1 = nn.Linear(512, 64)
+        self.act1 = nn.Tanh()
+        self.fc2 = nn.Linear(64, 4)
+        self.act2 = nn.Tanh()
 
     def generate_input(self, lengths, primary, evolutionary):
         """
@@ -81,9 +83,9 @@ class ResNet(nn.Module):
 
         # Run through linear and activation layers
         output = self.fc1(output)
-        output = torch.tanh(output)
-        # output = self.fc2(output)
-        # output = torch.tanh(output)
+        output = self.act1(output)
+        output = self.fc2(output)
+        output = self.act2(output)
 
         # [Batch * Max_length, 4] -> [Batch, 4, Max_length]
         output = output.view(MINIBATCH_SIZE, lengths[0], 4)

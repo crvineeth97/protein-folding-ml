@@ -1,7 +1,7 @@
 import datetime
 import logging
-from time import time
 import sys
+from time import time
 
 import torch
 
@@ -38,7 +38,7 @@ train_time = str(datetime.timedelta(seconds=time() - start))
 logging.info("Total training time: %s", train_time)
 
 with open(get_model_dir() + "summary.txt", "a") as f:
-    f.write("Training time: " + train_time)
+    f.write("Training time: " + train_time + "\n")
     f.write("Total number of parameters: " + str(total_params) + "\n")
     f.write("Number of trainable parameters: " + str(train_params) + "\n")
     f.write("Model Description and changes: " + sys.argv[1] + "\n")
