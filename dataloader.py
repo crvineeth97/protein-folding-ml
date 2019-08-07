@@ -6,10 +6,10 @@ from torch.utils.data import DataLoader, Dataset
 from constants import MINIBATCH_SIZE
 
 
-def contruct_dataloader_from_disk(foldername):
+def contruct_dataloader_from_disk(foldername, batch_size=MINIBATCH_SIZE):
     return DataLoader(
         ProteinNetDataset(foldername),
-        batch_size=MINIBATCH_SIZE,
+        batch_size=batch_size,
         shuffle=True,
         collate_fn=merge_samples_to_minibatch,
         drop_last=True,

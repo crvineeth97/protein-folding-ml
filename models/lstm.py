@@ -8,7 +8,7 @@ from constants import DEVICE, MINIBATCH_SIZE
 
 class LSTM(nn.Module):
     def __init__(
-        self, num_input_dims=41, num_lstm_units=2, num_lstm_layers=2, num_out_dims=4
+        self, num_input_dims=41, num_lstm_units=100, num_lstm_layers=2, num_out_dims=4
     ):
         super(LSTM, self).__init__()
         self.num_input_dims = num_input_dims
@@ -64,7 +64,6 @@ class LSTM(nn.Module):
         # [Batch, Max_length, embedding_dim] -> [Batch, Max_length, num_lstm_units]
         # pack_padded_sequence so that padded items in the sequence won't be shown to the LSTM
         output = pack_padded_sequence(output, lengths, batch_first=True)
-
         # now run through LSTM
         output, self.hidden = self.lstm(output, self.hidden)
 

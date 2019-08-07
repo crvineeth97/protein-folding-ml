@@ -5,33 +5,36 @@ from os import listdir
 import numpy as np
 import torch
 
-from constants import HIDE_UI, MINIBATCH_SIZE, TESTING_FOLDER
+from constants import HIDE_UI, TESTING_FOLDER
 from dataloader import contruct_dataloader_from_disk
 from preprocessing import filter_input_files
 from util import get_model_dir
 from visualize import Visualizer
 
 
-def compute_mae(lengths, pred, act):
+def compute_mae(length, pred, act):
     # Compute MAE in degrees
     mae = 0
-    for i in range(MINIBATCH_SIZE):
-        tmp = 0
-        for j in range(lengths[i]):
-            tmp += abs(pred[i][j] - act[i][j]) * 180.0 / np.pi
-        tmp /= lengths[i]
-        mae += tmp
-    mae /= MINIBATCH_SIZE
+    tmp = 0
+    for j in range(length):
+        difference = abs(
+            np.arctan2(np.sin(act[j] - pred[j]), np.cos(act[j] - pred[j]))
+            * 180.0
+            / np.pi
+        )
+        tmp += difference
+    tmp /= length
+    mae += tmp
     return mae
 
 
 def test_model(model, criterion, model_dir=None, sleep_time=0):
-    visualize = Visualizer()
     loss = 0
-    phi_mae = 0
-    psi_mae = 0
+    running_phi_mae = 0
+    running_psi_mae = 0
+    visualize = None
     with torch.no_grad():
-        test_loader = contruct_dataloader_from_disk(TESTING_FOLDER)
+        test_loader = contruct_dataloader_from_disk(TESTING_FOLDER, 1)
         test_size = test_loader.dataset.__len__()
         for i, data in enumerate(test_loader):
             # Tertiary is [Batch, Length, 9]
@@ -45,16 +48,20 @@ def test_model(model, criterion, model_dir=None, sleep_time=0):
             output = output.cpu().numpy()
             pred_phi = np.arctan2(output[:, 0, :], output[:, 1, :])
             pred_psi = np.arctan2(output[:, 2, :], output[:, 3, :])
-            phi_mae += compute_mae(lengths, pred_phi, act_phi)
-            psi_mae += compute_mae(lengths, pred_psi, act_psi)
+            phi_mae = compute_mae(lengths[0], pred_phi[0], act_phi[0])
+            psi_mae = compute_mae(lengths[0], pred_psi[0], act_psi[0])
+            running_phi_mae += phi_mae
+            running_psi_mae += psi_mae
             if not HIDE_UI:
+                if not visualize:
+                    visualize = Visualizer()
                 visualize.plot_ramachandran(
-                    pred_phi[0], pred_psi[0], act_phi[0], act_psi[0]
+                    pred_phi[0], pred_psi[0], act_phi[0], act_psi[0], phi_mae, psi_mae
                 )
                 time.sleep(sleep_time)
         loss /= test_size
-        phi_mae /= test_size
-        psi_mae /= test_size
+        running_phi_mae /= test_size
+        running_psi_mae /= test_size
 
     if model_dir:
         from sys import stdout
@@ -82,4 +89,4 @@ if __name__ == "__main__":
         print("Testing model " + model_dir)
         model_path = "output/" + model_dir + "/best.model"
         model = torch.load(model_path, map_location={"cuda:0": "cpu"})
-        test_model(model, criterion, model_dir, 1)
+        test_model(model, criterion, model_dir, 15)
