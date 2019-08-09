@@ -30,7 +30,8 @@ logging.info("Number of trainable parameters: %d", train_params)
 
 start = time()
 preprocess_raw_data()
-logging.info("Total preprocessing time: %f", time() - start)
+preprocess_time = str(datetime.timedelta(seconds=time() - start))
+logging.info("Total preprocessing time: %f", preprocess_time)
 
 start = time()
 train_model(model, criterion, optimizer)
