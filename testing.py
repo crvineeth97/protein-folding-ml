@@ -89,4 +89,4 @@ if __name__ == "__main__":
         print("Testing model " + model_dir)
         model_path = "output/" + model_dir + "/best.model"
         model = torch.load(model_path, map_location={"cuda:0": "cpu"})
-        test_model(model, criterion, model_dir, 15)
+        test_model(model, criterion, model_dir, 2)

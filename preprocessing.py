@@ -1,5 +1,6 @@
 import logging
-import multiprocessing
+
+# import multiprocessing
 from datetime import timedelta
 from os import listdir, makedirs
 from os.path import exists
@@ -221,62 +222,60 @@ def process_file(input_file, output_folder):
     prev_read_time = 0
     prev_process_time = 0
     prev_write_time = 0
-    num_cpus = multiprocessing.cpu_count()
+    # num_cpus = multiprocessing.cpu_count()
+    # logging.info("Using %d CPUs for preprocessing", num_cpus)
 
-    with multiprocessing.Pool(num_cpus) as p:
-        while True:
-            proteins = []
-            # While there's more proteins to process
-            read_time_start = time()
-            for _ in range(num_cpus):
-                protein = read_protein(input_file_pointer)
-                # Reached end of file, stop processing
-                proteins.append(protein)
-                if protein is None:
-                    break
-            idx += num_cpus
-            total_read_time += time() - read_time_start
+    # with multiprocessing.Pool(num_cpus) as pool:
+    while True:
+        # proteins = []
+        # While there's more proteins to process
+        read_time_start = time()
+        # for _ in range(num_cpus):
+        protein = read_protein(input_file_pointer)
+        # Reached end of file, stop processing
+        # proteins.append(protein)
+        if protein is None:
+            break
+        idx += 1
+        total_read_time += time() - read_time_start
 
-            # Process the protein
-            process_time_start = time()
-            processed_proteins = p.map(process_protein, proteins)
-            total_process_time += time() - process_time_start
+        # Process the protein
+        process_time_start = time()
+        protein = process_protein(protein)
+        total_process_time += time() - process_time_start
 
-            # The .npz file format is a zipped archive of files
-            # named after the variables they contain. The archive is
-            # NOT compressed and each file in the archive contains
-            # one variable in .npy format
-            write_time_start = time()
-            for protein in processed_proteins:
-                # If there was an error in the protein, skip it
-                if protein is None:
-                    continue
-                np.savez(output_folder + protein["id"] + ".npz", **protein)
-            total_write_time += time() - write_time_start
+        # The .npz file format is a zipped archive of files
+        # named after the variables they contain. The archive is
+        # NOT compressed and each file in the archive contains
+        # one variable in .npy format
+        write_time_start = time()
+        # for protein in processed_proteins:
+        # If there was an error in the protein, skip it
+        if protein is None:
+            continue
+        np.savez(output_folder + protein["id"] + ".npz", **protein)
+        total_write_time += time() - write_time_start
 
-            if proteins[-1] is None:
-                break
+        if idx % 1000 == 0:
+            logging.info("Last: %s | %d proteins processed", protein["id"], idx)
+            logging.info(
+                "Read time %s | Process time %s | Write time %s",
+                str(timedelta(seconds=total_read_time - prev_read_time)),
+                str(timedelta(seconds=total_process_time - prev_process_time)),
+                str(timedelta(seconds=total_write_time - prev_write_time)),
+            )
+            prev_read_time = total_read_time
+            prev_process_time = total_process_time
+            prev_write_time = total_write_time
 
-            if idx % 1000 == 0:
-                logging.info("Last: %s | %d proteins processed", proteins[-1]["id"], idx)
-                logging.info(
-                    "Read time %s | Process time %s | Write time %s",
-                    str(timedelta(seconds=total_read_time - prev_read_time)),
-                    str(timedelta(seconds=total_process_time - prev_process_time)),
-                    str(timedelta(seconds=total_write_time - prev_write_time)),
-                )
-                prev_read_time = total_read_time
-                prev_process_time = total_process_time
-                prev_write_time = total_write_time
-
-        input_file_pointer.close()
-        logging.info("Wrote output of %d proteins to %s folder", idx, output_folder)
-        logging.info(
-            "Total Read time %s | Process time %s | Write time %s",
-            str(timedelta(seconds=total_read_time)),
-            str(timedelta(seconds=total_process_time)),
-            str(timedelta(seconds=total_write_time)),
-        )
+    input_file_pointer.close()
+    logging.info("Wrote output of %d proteins to %s folder", idx, output_folder)
+    logging.info(
+        "Total Read time %s | Process time %s | Write time %s",
+        str(timedelta(seconds=total_read_time)),
+        str(timedelta(seconds=total_process_time)),
+        str(timedelta(seconds=total_write_time)),
+    )
 
 
 def filter_input_files(input_files):
@@ -319,10 +318,13 @@ def preprocess_raw_data():
 if __name__ == "__main__":
     from sys import stdout
 
+    file_handler = logging.FileHandler(filename="output/" + "preprocessing.txt")
+    stdout_handler = logging.StreamHandler(stdout)
+    handlers = [file_handler, stdout_handler]
     logging.basicConfig(
         format="%(asctime)s %(message)s",
         datefmt="%H:%M:%S",
         level=logging.INFO,
-        stream=stdout,
+        handlers=handlers,
     )
     preprocess_raw_data()

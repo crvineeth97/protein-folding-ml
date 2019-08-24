@@ -24,22 +24,23 @@
 export EXP_NAME="dihedral_predictions"
 
 # Copy necessary files to a scratch directory and cd into it
+# rm -rf /scratch/$USER/$EXP_NAME
 mkdir -p /scratch/$USER/$EXP_NAME
-rsync -aP ./ /scratch/$USER/$EXP_NAME
+rsync -a ./ /scratch/$USER/$EXP_NAME
 cd /scratch/$USER/$EXP_NAME
 
-# rsync -aP ada:/share2/$USER/data/casp12/training_30 ./data/raw/
-# rsync -aP ada:/share2/$USER/data/casp12/validation ./data/raw/
-# rsync -aP ada:/share2/$USER/data/casp12/testing ./data/raw/
-rsync -aP ada:/share2/$USER/$EXP_NAME/data/preprocessed ./data
-
-# Load the necessary modules
-module load cuda/10.0
-module load cudnn/7-cuda-10.0
+# rsync -a ada:/share2/$USER/data/casp12/training_30 ./data/raw/
+# rsync -a ada:/share2/$USER/data/casp12/validation ./data/raw/
+# rsync -a ada:/share2/$USER/data/casp12/testing ./data/raw/
+rsync -a ada:/share2/$USER/$EXP_NAME/data/preprocessed/training_30* ./data/preprocessed
+rsync -a ada:/share2/$USER/$EXP_NAME/data/preprocessed/testing* ./data/preprocessed
+rsync -a ada:/share2/$USER/$EXP_NAME/data/preprocessed/validation* ./data/preprocessed
 
 # Run the necessary commands below
-source activate pyt
+conda activate pyt
+# python preprocessing.py
 python main.py "$1"
-conda deactivate pyt
+# python testing.py
+conda deactivate
 
-rsync -aP ./ ada:/share2/$USER/$EXP_NAME
+rsync -a ./ ada:/share2/$USER/$EXP_NAME
