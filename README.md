@@ -19,7 +19,7 @@ To run this project:
 * Clone the repository
 * Install the above package requirements
 * Transfer the ProteinNet training, testing and validation files into `data/raw/`
-* Run `python main.py`
+* Run `python main.py "<Some comment>"`
 
 ## License
 

@@ -12,7 +12,7 @@ def contruct_dataloader_from_disk(foldername, batch_size=MINIBATCH_SIZE):
         batch_size=batch_size,
         shuffle=True,
         collate_fn=merge_samples_to_minibatch,
-        drop_last=True,
+        drop_last=False,
     )
 
 

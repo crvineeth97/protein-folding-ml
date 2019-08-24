@@ -5,26 +5,21 @@ from os import listdir
 import numpy as np
 import torch
 
-from constants import HIDE_UI, TESTING_FOLDER
+from constants import HIDE_UI, TESTING_FOLDER, DEVICE
 from dataloader import contruct_dataloader_from_disk
 from preprocessing import filter_input_files
-from util import get_model_dir
 from visualize import Visualizer
 
 
-def compute_mae(length, pred, act):
+def compute_mae(lengths, pred, act):
     # Compute MAE in degrees
-    mae = 0
-    tmp = 0
-    for j in range(length):
-        difference = abs(
-            np.arctan2(np.sin(act[j] - pred[j]), np.cos(act[j] - pred[j]))
-            * 180.0
-            / np.pi
-        )
-        tmp += difference
-    tmp /= length
-    mae += tmp
+    bs = len(lengths)
+    mae = np.zeros(bs)
+    for i in range(bs):
+        for j in range(lengths[i]):
+            diff = act[i][j] - pred[i][j]
+            mae[i] += min(abs(diff), abs(2 * np.pi - diff)) * 180.0 / np.pi
+        mae[i] /= lengths[i]
     return mae
 
 
@@ -48,45 +43,64 @@ def test_model(model, criterion, model_dir=None, sleep_time=0):
             output = output.cpu().numpy()
             pred_phi = np.arctan2(output[:, 0, :], output[:, 1, :])
             pred_psi = np.arctan2(output[:, 2, :], output[:, 3, :])
-            phi_mae = compute_mae(lengths[0], pred_phi[0], act_phi[0])
-            psi_mae = compute_mae(lengths[0], pred_psi[0], act_psi[0])
-            running_phi_mae += phi_mae
-            running_psi_mae += psi_mae
+            phi_mae = compute_mae(lengths, pred_phi, act_phi)
+            psi_mae = compute_mae(lengths, pred_psi, act_psi)
+            running_phi_mae += phi_mae.sum()
+            running_psi_mae += psi_mae.sum()
             if not HIDE_UI:
                 if not visualize:
                     visualize = Visualizer()
-                visualize.plot_ramachandran(
-                    pred_phi[0], pred_psi[0], act_phi[0], act_psi[0], phi_mae, psi_mae
-                )
-                time.sleep(sleep_time)
+                bs = len(lengths)
+                for i in range(bs):
+                    visualize.plot_ramachandran(
+                        pred_phi[i],
+                        pred_psi[i],
+                        act_phi[i],
+                        act_psi[i],
+                        phi_mae[i],
+                        psi_mae[i],
+                    )
+                    time.sleep(sleep_time)
+        # Fix loss w.r.t. batch_size
         loss /= test_size
         running_phi_mae /= test_size
         running_psi_mae /= test_size
-
-    if model_dir:
-        from sys import stdout
-
-        write_to = "output/" + model_dir + "/testing.txt"
-        logging.basicConfig(stream=stdout, level=logging.INFO)
-    else:
-        write_to = get_model_dir() + "summary.txt"
 
     logging.info("Testing loss: %.10lf", loss)
     logging.info("Phi MAE: %.10lf", running_phi_mae)
     logging.info("Psi MAE: %.10lf", running_psi_mae)
 
-    with open(write_to, "a") as f:
-        f.write("Testing loss: " + str(loss) + "\n")
-        f.write("Phi MAE: " + str(running_phi_mae) + "\n")
-        f.write("Psi MAE: " + str(running_psi_mae) + "\n")
-
 
 if __name__ == "__main__":
+    from sys import stdout
+
+    stdout_handler = logging.StreamHandler(stdout)
     criterion = torch.nn.MSELoss()
     input_files = listdir("output/")
     input_files_filtered = filter_input_files(input_files)
     for model_dir in input_files_filtered:
-        print("Testing model " + model_dir)
-        model_path = "output/" + model_dir + "/best.model"
-        model = torch.load(model_path)
-        test_model(model, criterion, model_dir, 2)
+        model_dir = "output/" + model_dir
+        file_handler = logging.FileHandler(filename=model_dir + "testing.txt")
+        handlers = [file_handler, stdout_handler]
+        logging.basicConfig(
+            format="%(asctime)s %(message)s",
+            datefmt="%H:%M:%S",
+            level=logging.INFO,
+            handlers=handlers,
+        )
+
+        logging.info("Testing best model in " + model_dir)
+        model_path = model_dir + "/best.model"
+        if DEVICE == torch.device("cpu"):
+            model = torch.load(model_path, map_location={"cuda:0": "cpu"})
+        else:
+            model = torch.load(model_path)
+        test_model(model, criterion, model_dir, 1)
+
+        logging.info("Testing latest model in " + model_dir)
+        model_path = model_dir + "/latest.model"
+        if DEVICE == torch.device("cpu"):
+            model = torch.load(model_path, map_location={"cuda:0": "cpu"})
+        else:
+            model = torch.load(model_path)
+        test_model(model, criterion, model_dir, 1)
