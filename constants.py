@@ -13,13 +13,13 @@ MINIBATCH_SIZE = 1
 LEARNING_RATE = 0.001
 
 # Print training loss every PRINT_LOSS_INTERVAL batch iterations
-PRINT_LOSS_INTERVAL = 100
+PRINT_LOSS_INTERVAL = 10
 
 # Number of times to go through the dataset while training
-TRAINING_EPOCHS = 50
+TRAINING_EPOCHS = 10
 
 # Evaluate model on validation set every EVAL_INTERVAL minibatches
-EVAL_INTERVAL = 2000
+EVAL_INTERVAL = 200
 
 # List of amino acids and their integer representation
 AA_ID_DICT = {

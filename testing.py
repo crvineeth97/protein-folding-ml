@@ -72,13 +72,13 @@ def test_model(model, criterion, model_dir=None, sleep_time=0):
         write_to = get_model_dir() + "summary.txt"
 
     logging.info("Testing loss: %.10lf", loss)
-    logging.info("Phi MAE: %.10lf", phi_mae)
-    logging.info("Psi MAE: %.10lf", psi_mae)
+    logging.info("Phi MAE: %.10lf", running_phi_mae)
+    logging.info("Psi MAE: %.10lf", running_psi_mae)
 
     with open(write_to, "a") as f:
         f.write("Testing loss: " + str(loss) + "\n")
-        f.write("Phi MAE: " + str(phi_mae) + "\n")
-        f.write("Psi MAE: " + str(psi_mae) + "\n")
+        f.write("Phi MAE: " + str(running_phi_mae) + "\n")
+        f.write("Psi MAE: " + str(running_psi_mae) + "\n")
 
 
 if __name__ == "__main__":
@@ -88,5 +88,5 @@ if __name__ == "__main__":
     for model_dir in input_files_filtered:
         print("Testing model " + model_dir)
         model_path = "output/" + model_dir + "/best.model"
-        model = torch.load(model_path, map_location={"cuda:0": "cpu"})
+        model = torch.load(model_path)
         test_model(model, criterion, model_dir, 2)

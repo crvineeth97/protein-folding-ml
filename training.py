@@ -40,6 +40,8 @@ def validate_model(model, criterion):
         for _, data in enumerate(validation_loader):
             # Tertiary is [Batch, Length, 9]
             lengths, primary, evolutionary, act_phi, act_psi, act_omega, tertiary = data
+            if lengths[0] < 64:
+                continue
             inp = model.generate_input(lengths, primary, evolutionary)
             # Doesn't require gradients to go backwards, hence detach the output
             target = model.generate_target(lengths, act_phi, act_psi, act_omega)
@@ -104,6 +106,8 @@ def train_model(model, criterion, optimizer):
             # And each element will be of shape (Length,)
             # phi, psi and omega are in radians here
             lengths, primary, evolutionary, act_phi, act_psi, act_omega = data
+            if lengths[0] < 16:
+                continue
             # inp should be of shape [Batch, 41, Max_length]
             inp = model.generate_input(lengths, primary, evolutionary)
             # target should be of shape [Batch, 4, Max_length]

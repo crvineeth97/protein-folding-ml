@@ -8,7 +8,8 @@ import torch
 from constants import DEVICE, LEARNING_RATE
 
 # from models.resnet import ResNet
-from models.lstm import LSTM
+# from models.lstm import LSTM
+from models.unet import UNet
 from preprocessing import preprocess_raw_data
 from testing import test_model
 from training import train_model
@@ -18,7 +19,7 @@ if len(sys.argv) != 2:
     print("Please provide a description for the model and changes made")
     exit(1)
 
-model = LSTM().to(DEVICE)
+model = UNet().to(DEVICE)
 criterion = torch.nn.MSELoss()
 # TODO Try various options of Adam
 optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
