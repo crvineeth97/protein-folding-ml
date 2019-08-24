@@ -112,5 +112,8 @@ output/
 # Extra outputs from specific steps or extra code not needed
 extras
 
-# slurm output files when running on Ada
+# Slurm output files when running on Ada
 slurm*
+
+# Debug files
+debug

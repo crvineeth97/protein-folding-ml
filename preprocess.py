@@ -16,7 +16,7 @@ from constants import (
     MASK_DICT,
     PREPROCESS_PROTEIN_WITH_MISSING_RESIDUES,
 )
-from util import (
+from preprocess_utils import (
     calculate_omega_from_masked_tertiary,
     calculate_phi_from_masked_tertiary,
     calculate_psi_from_masked_tertiary,

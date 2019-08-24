@@ -6,21 +6,21 @@ from time import time
 import torch
 
 from constants import DEVICE, LEARNING_RATE
+from utils import get_model_dir, init_output_dir
 
-# from models.resnet import ResNet
+from models.resnet import ResNet
 # from models.lstm import LSTM
-from models.unet import UNet
-from preprocessing import preprocess_raw_data
-from testing import test_model
-from training import train_model
-from util import get_model_dir, init_output_dir
+# from models.unet_1d import UNet
+from preprocess import preprocess_raw_data
+from test import test_model
+from train import train_model
 
 if len(argv) != 2:
     print("Please provide a description for the model and changes made")
     exit(1)
 
 # Initialize model and logging
-model = UNet().to(DEVICE)
+model = ResNet().to(DEVICE)
 criterion = torch.nn.MSELoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
 init_output_dir(model)

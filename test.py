@@ -5,9 +5,9 @@ from os import listdir
 import numpy as np
 import torch
 
-from constants import HIDE_UI, TESTING_FOLDER, DEVICE
+from constants import DEVICE, HIDE_UI, TESTING_FOLDER
 from dataloader import contruct_dataloader_from_disk
-from preprocessing import filter_input_files
+from utils import calculate_loss, generate_input, generate_target
 from visualize import Visualizer
 
 
@@ -34,11 +34,11 @@ def test_model(model, criterion, model_dir=None, sleep_time=0):
         for i, data in enumerate(test_loader):
             # Tertiary is [Batch, Length, 9]
             lengths, primary, evolutionary, act_phi, act_psi, act_omega, tertiary = data
-            inp = model.generate_input(lengths, primary, evolutionary)
+            inp = generate_input(lengths, primary, evolutionary)
             # Doesn't require gradients to go backwards, hence detach the output
-            target = model.generate_target(lengths, act_phi, act_psi, act_omega)
+            target = generate_target(lengths, act_phi, act_psi, act_omega)
             output = model(inp, lengths)
-            loss += model.calculate_loss(lengths, criterion, output, target).item()
+            loss += calculate_loss(lengths, criterion, output, target).item()
             # The following will be of size [Batch, Length]
             output = output.cpu().numpy()
             pred_phi = np.arctan2(output[:, 0, :], output[:, 1, :])
@@ -73,6 +73,7 @@ def test_model(model, criterion, model_dir=None, sleep_time=0):
 
 if __name__ == "__main__":
     from sys import stdout
+    from preprocess import filter_input_files
 
     stdout_handler = logging.StreamHandler(stdout)
     criterion = torch.nn.MSELoss()

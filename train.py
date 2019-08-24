@@ -15,7 +15,14 @@ from constants import (
     VALIDATION_FOLDER,
 )
 from dataloader import contruct_dataloader_from_disk
-from util import calc_rmsd, write_model_to_disk, get_model_dir
+from utils import (
+    calculate_rmsd,
+    calculate_loss,
+    generate_input,
+    generate_target,
+    get_model_dir,
+    write_model_to_disk,
+)
 from visualize import Visualizer
 
 
@@ -42,11 +49,11 @@ def validate_model(model, criterion):
             lengths, primary, evolutionary, act_phi, act_psi, act_omega, tertiary = data
             if lengths[0] < 64:
                 continue
-            inp = model.generate_input(lengths, primary, evolutionary)
+            inp = generate_input(lengths, primary, evolutionary)
             # Doesn't require gradients to go backwards, hence detach the output
-            target = model.generate_target(lengths, act_phi, act_psi, act_omega)
+            target = generate_target(lengths, act_phi, act_psi, act_omega)
             output = model(inp, lengths)
-            loss += model.calculate_loss(lengths, criterion, output, target)
+            loss += calculate_loss(lengths, criterion, output, target)
             # The following will be of size [Batch, Length]
             pred_phi = torch.atan2(output[:, 0, :], output[:, 1, :]).unsqueeze(1)
             pred_psi = torch.atan2(output[:, 2, :], output[:, 3, :]).unsqueeze(1)
@@ -75,7 +82,7 @@ def validate_model(model, criterion):
             predicted_coords = coordinates.transpose(0, 1)
             actual_coords = transform_tertiary(lengths, tertiary)
             # TODO Improve RMSD calculation
-            rmsd += calc_rmsd(predicted_coords, actual_coords, lengths)
+            rmsd += calculate_rmsd(predicted_coords, actual_coords, lengths)
             # drmsd += calc_drmsd(predicted_coords, actual_coords)
             batch_iter += 1
 
@@ -106,16 +113,14 @@ def train_model(model, criterion, optimizer):
             # And each element will be of shape (Length,)
             # phi, psi and omega are in radians here
             lengths, primary, evolutionary, act_phi, act_psi, act_omega = data
-            if lengths[0] < 16:
-                continue
             # inp should be of shape [Batch, 41, Max_length]
-            inp = model.generate_input(lengths, primary, evolutionary)
+            inp = generate_input(lengths, primary, evolutionary)
             # target should be of shape [Batch, 4, Max_length]
-            target = model.generate_target(lengths, act_phi, act_psi, act_omega)
+            target = generate_target(lengths, act_phi, act_psi, act_omega)
             # output should be of shape [Batch, 4, Max_length]
             # sin(phi), cos(phi), sin(psi), cos(psi), sin(omega), cos(omega)
             output = model(inp, lengths)
-            loss = model.calculate_loss(lengths, criterion, output, target)
+            loss = calculate_loss(lengths, criterion, output, target)
             running_train_loss += loss.item()
             epoch_train_loss += loss.item()
             optimizer.zero_grad()
