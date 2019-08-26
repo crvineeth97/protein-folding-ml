@@ -49,6 +49,10 @@ def init_output_dir(model):
     )
     logging.info("PRINT_LOSS_INTERVAL: %d", PRINT_LOSS_INTERVAL)
     logging.info("TRAINING_EPOCHS: %d", TRAINING_EPOCHS)
+    total_params = sum(p.numel() for p in model.parameters())
+    train_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    logging.info("Total number of parameters: %d", total_params)
+    logging.info("Number of trainable parameters: %d", train_params)
     logging.info(model)
 
 
