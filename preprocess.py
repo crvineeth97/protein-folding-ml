@@ -10,124 +10,17 @@ from time import time
 import numpy as np
 
 from constants import (
-    AA_ID_DICT,
-    DSSP_DICT,
     FORCE_PREPROCESSING_OVERWRITE,
-    MASK_DICT,
     PREPROCESS_PROTEIN_WITH_MISSING_RESIDUES,
 )
 from preprocess_utils import (
-    calculate_omega_from_masked_tertiary,
-    calculate_phi_from_masked_tertiary,
-    calculate_psi_from_masked_tertiary,
+    calculate_omega,
+    calculate_phi,
+    calculate_psi,
+    calculate_binary_contact_map,
     masked_select,
+    read_protein,
 )
-
-
-def read_protein(file_pointer):
-    protein = {}
-
-    is_protein_info_correct = True
-
-    while True:
-        next_line = file_pointer.readline()
-
-        if not is_protein_info_correct:
-            if next_line == "\n":
-                return {}
-            else:
-                continue
-
-        # ID of the protein
-        if next_line == "[ID]\n":
-            id_ = file_pointer.readline()[:-1]
-            protein.update({"id": id_})
-
-        # Amino acid sequence of the protein
-        elif next_line == "[PRIMARY]\n":
-            # Convert amino acids into their numeric representation
-            primary = list([AA_ID_DICT[aa] for aa in file_pointer.readline()[:-1]])
-            seq_len = len(primary)
-            protein.update({"primary": primary})
-
-        # PSSM matrix + Information Content
-        # Dimensions: [21, Protein Length]
-        # First 20 rows represents the PSSM info of
-        # each amino acid in alphabetical order
-        # 21st row represents information content
-        elif next_line == "[EVOLUTIONARY]\n":
-            evolutionary = []
-            for residue in range(21):
-                evolutionary.append(
-                    [
-                        np.float32(log_likelihoods)
-                        for log_likelihoods in file_pointer.readline().split()
-                    ]
-                )
-                if len(evolutionary[-1]) != seq_len:
-                    logging.info(
-                        "Error in evolutionary information of protein with id %s. Skipping it",
-                        id_,
-                    )
-                    is_protein_info_correct = False
-                    continue
-            protein.update({"evolutionary": evolutionary})
-
-        # Secondary structure information of the protein
-        # 8 classes: L, H, B, E, G, I, T, S
-        elif next_line == "[SECONDARY]\n":
-            secondary = list([DSSP_DICT[dssp] for dssp in file_pointer.readline()[:-1]])
-            protein.update({"secondary": secondary})
-
-        # Tertiary structure information of the protein
-        # The values are represented in picometers
-        # => Relative to PDB, multiply by 100
-        # Dimensions: [3, 3 * Protein Length]
-        # Eg: for protein of length 1
-        #      N       C_a       C
-        # X  2841.8,  2873.4,  2919.7
-        # Y  -864.7,  -957.9,  -877.0
-        # Z -6727.1, -6616.3, -6496.2
-        elif next_line == "[TERTIARY]\n":
-            tertiary = []
-            for axis in range(3):
-                tertiary.append(
-                    [
-                        np.float32(coord) / 100.0
-                        for coord in file_pointer.readline().split()
-                    ]
-                )
-                if len(tertiary[-1]) != 3 * seq_len:
-                    logging.info(
-                        "Error in tertiary information of protein with id %s. Skipping it",
-                        id_,
-                    )
-                    is_protein_info_correct = False
-                    continue
-            protein.update({"tertiary": tertiary})
-
-        # Some residues might be missing from a protein
-        # Mask contains a '+' or a '-' based on whether
-        # the residue has tertiary information or not
-        elif next_line == "[MASK]\n":
-            mask = list([MASK_DICT[aa] for aa in file_pointer.readline()[:-1]])
-            if len(mask) != seq_len:
-                logging.info(
-                    "Error in masking information of protein with id %s. Skipping it",
-                    id_,
-                )
-                is_protein_info_correct = False
-                continue
-            protein.update({"mask": mask})
-
-        # All the information of the current protein
-        # is available in dict now
-        elif next_line == "\n":
-            return protein
-
-        # File has been read completely
-        elif next_line == "":
-            return None
 
 
 def process_protein(protein):
@@ -193,12 +86,15 @@ def process_protein(protein):
     masked_length = len(primary_masked)
     assert len(evolutionary_masked) == masked_length
     # assert len(secondary_masked) == masked_length
-    phi = calculate_phi_from_masked_tertiary(tertiary_masked)
+    phi = calculate_phi(tertiary_masked)
     assert len(phi) == masked_length
-    psi = calculate_psi_from_masked_tertiary(tertiary_masked)
+    psi = calculate_psi(tertiary_masked)
     assert len(psi) == masked_length
-    omega = calculate_omega_from_masked_tertiary(tertiary_masked)
+    omega = calculate_omega(tertiary_masked)
     assert len(omega) == masked_length
+    contact_map = calculate_binary_contact_map(tertiary_masked)
+    assert len(contact_map) == masked_length
+    assert len(contact_map[0]) == masked_length
 
     processed_protein = {
         "id": protein["id"],
@@ -208,6 +104,7 @@ def process_protein(protein):
         "psi": psi,
         "omega": omega,
         "tertiary": tertiary_masked,
+        "contact_map": contact_map,
     }
     return processed_protein
 
