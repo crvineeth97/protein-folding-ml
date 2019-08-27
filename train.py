@@ -23,7 +23,7 @@ from utils import (
     get_model_dir,
     write_model_to_disk,
 )
-from visualize import Visualizer
+from visualize import RamachandranPlot
 
 
 def transform_tertiary(lengths, tertiary):
@@ -152,7 +152,7 @@ def train_model(model, criterion, optimizer):
                     pred_phi = np.arctan2(output[0, :], output[1, :])
                     pred_psi = np.arctan2(output[2, :], output[3, :])
                     if not visualize:
-                        visualize = Visualizer()
+                        visualize = RamachandranPlot()
                     visualize.plot_ramachandran(
                         pred_phi, pred_psi, act_phi[0], act_psi[0]
                     )

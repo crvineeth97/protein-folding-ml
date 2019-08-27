@@ -1,14 +1,15 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
+plt.ion()
 
-class Visualizer:
+
+class RamachandranPlot:
     def __init__(self):
         self.is_plot_initialized = False
-        plt.ion()
         self.fig = plt.figure(figsize=(16, 9))
         self.ax = self.fig.add_subplot(111)
-        plt.title("Ramachandran plot")
+        self.fig.suptitle("Ramachandran plot")
         ticks = np.arange(-180, 181, 30)
         self.ax.set_xticks(ticks)
         self.ax.set_yticks(ticks)
@@ -17,6 +18,7 @@ class Visualizer:
         self.ax.set_xlabel("Phi", color="black")
         self.pred_line = None
         self.act_line = None
+        plt.pause(0.5)
 
     def plot_ramachandran(
         self, pred_phi, pred_psi, act_phi, act_psi, phi_mae=None, psi_mae=None
@@ -43,5 +45,25 @@ class Visualizer:
             self.act_line.set_xdata(act_phi)
             self.act_line.set_ydata(act_psi)
             self.text.set_text(str(phi_mae) + " | " + str(psi_mae))
+        self.fig.canvas.draw()
+        self.fig.canvas.flush_events()
+
+
+class ContactMap:
+    def __init__(self):
+        self.is_plot_initialized = False
+        self.fig = plt.figure(figsize=(16, 9))
+        self.ax = self.fig.add_subplot(111)
+        self.ax.set_axis_off()
+        self.img = None
+        plt.pause(0.5)
+
+    def plot_contact_map(self, prot_id, contact_map):
+        self.fig.suptitle(prot_id)
+        if not self.is_plot_initialized:
+            self.img = self.ax.imshow(contact_map, aspect="equal")
+            self.is_plot_initialized = True
+        else:
+            self.img.set_data(A=contact_map)
         self.fig.canvas.draw()
         self.fig.canvas.flush_events()

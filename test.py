@@ -8,7 +8,7 @@ import torch
 from constants import DEVICE, HIDE_UI, TESTING_FOLDER
 from dataloader import contruct_dataloader_from_disk
 from utils import calculate_loss, generate_input, generate_target
-from visualize import Visualizer
+from visualize import RamachandranPlot
 
 
 def compute_mae(lengths, pred, act):
@@ -49,7 +49,7 @@ def test_model(model, criterion, model_dir=None, sleep_time=0):
             running_psi_mae += psi_mae.sum()
             if not HIDE_UI:
                 if not visualize:
-                    visualize = Visualizer()
+                    visualize = RamachandranPlot()
                 bs = len(lengths)
                 for i in range(bs):
                     visualize.plot_ramachandran(

@@ -5,11 +5,8 @@
 - [ ] Fix resnet_2d.py
 - [ ] Check calculation of RMSD and DRMSD
 - [ ] Add multiple GPU support and distributed training
-- [ ] Optimize input, output and target generation in Resnet
-- [ ] Use radians instead of degrees, everywhere
-- [ ] Combine omega and psi calculation
+- [ ] Optimize input, output and target generation
 - [ ] Use LSTM layers after the resnet instead of fully connected layers
-- [ ] Fix minibatch error, drop_last is set to true so find a way to ensure that the last set is taken into consideration
 
 ## Done
 
@@ -17,8 +14,10 @@
 - [x] Fix validation part of the train function in main
 - [x] Use float16 instead of float32? Avoid using float16 because compute capability of the 1080TI is 6.1 and float16 performance is much slower than float 32
 - [x] Resnet_1D is not multiplying the channels by 2. Check why
+- [x] Use radians instead of degrees, everywhere
 - [x] Store the preprocessed files without the padding so that the size of the file is minimized
 - [x] Write code to read the above files and then pad them according to batches where the maximum length protein determines the padding of the whole batch
+- [x] Fix minibatch error, drop_last is set to true so find a way to ensure that the last set is taken into consideration
 
 ## List of parameters to tweak for various models
 
