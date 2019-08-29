@@ -2,10 +2,11 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-from constants import DEVICE, MINIBATCH_SIZE
+from .base import Base
+from constants import DEVICE
 
 
-class UNet(nn.Module):
+class UNet(Base):
     def __init__(
         self,
         in_channels=41,
@@ -118,7 +119,7 @@ class UNetUpBlock(nn.Module):
         if dim_2 == 0:
             return up
         return torch.cat(
-            [up, torch.zeros(MINIBATCH_SIZE, up.shape[1], dim_2).to(DEVICE)], 2
+            [up, torch.zeros(up.shape[0], up.shape[1], dim_2).to(DEVICE)], 2
         )
 
     def forward(self, x, bridge):

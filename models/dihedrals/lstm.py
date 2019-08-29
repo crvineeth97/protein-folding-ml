@@ -1,10 +1,10 @@
 import torch
-import torch.nn as nn
 from torch.autograd import Variable
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
+from .base import Base
 
 
-class LSTM(nn.Module):
+class LSTM(Base):
     def __init__(
         self, num_input_dims=41, num_lstm_units=100, num_lstm_layers=2, num_out_dims=4
     ):
@@ -25,16 +25,16 @@ class LSTM(nn.Module):
         #     batch_first=True,
         #     bidirectional=True,
         # )
-        self.lstm = nn.LSTM(
+        self.lstm = torch.nn.LSTM(
             input_size=self.num_input_dims,
             hidden_size=self.num_lstm_units,
             num_layers=self.num_lstm_layers,
             batch_first=True,
         )
-        self.fc1 = nn.Linear(
+        self.fc1 = torch.nn.Linear(
             in_features=self.num_lstm_units, out_features=self.num_out_dims
         )
-        self.act1 = nn.Tanh()
+        self.act1 = torch.nn.Tanh()
         # self.fc2 = nn.Linear(in_features=512, out_features=256)
         # self.act2 = nn.Tanh()
         # self.fc3 = nn.Linear(in_features=256, out_features=self.num_out_dims)

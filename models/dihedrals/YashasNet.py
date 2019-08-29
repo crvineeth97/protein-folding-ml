@@ -1,8 +1,9 @@
 import torch
 import torch.nn as nn
+from .base import Base
 
 
-class YashasNet(nn.Module):
+class YashasNet(Base):
     def __init__(self):
         super(YashasNet, self).__init__()
 
