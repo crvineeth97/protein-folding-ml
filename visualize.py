@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+from matplotlib import cm
 import numpy as np
 
 plt.ion()
@@ -50,16 +51,22 @@ class RamachandranPlot:
 
 
 class ContactMap:
-    def __init__(self):
+    def __init__(self, use_binary=False):
         self.is_plot_initialized = False
         self.fig = plt.figure(figsize=(16, 9))
         self.ax = self.fig.add_subplot(111)
         self.ax.set_axis_off()
         self.img = None
+        self.use_binary = use_binary
         plt.pause(0.5)
 
     def plot_contact_map(self, prot_id, contact_map):
         self.fig.suptitle(prot_id)
+        if self.use_binary:
+            contact_map = np.where(contact_map <= 8, 1, 0)
+        # self.norm = norm = cm.colors.Normalize(
+        #     vmax=abs(contact_map).max(), vmin=-abs(contact_map).max()
+        # )
         if not self.is_plot_initialized:
             self.img = self.ax.imshow(contact_map, aspect="equal")
             self.is_plot_initialized = True

@@ -130,15 +130,13 @@ def masked_select(data, mask, X=None):
     return output
 
 
-def calculate_binary_contact_map(tertiary):
+def build_contact_map(tertiary):
     protein_length = len(tertiary)
-    contact_map = np.zeros((protein_length, protein_length), dtype=np.bool)
-    threshold = 8
+    contact_map = np.zeros((protein_length, protein_length), dtype=np.float32)
     for i in range(protein_length):
         for j in range(i + 1, protein_length):
             dist = np.linalg.norm(tertiary[i][3:6] - tertiary[j][3:6])
-            if dist < threshold:
-                contact_map[i][j] = contact_map[j][i] = True
+            contact_map[i][j] = contact_map[j][i] = dist
     return contact_map
 
 

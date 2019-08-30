@@ -8,7 +8,7 @@ from torch import from_numpy, device
 
 sys.path.append("../")
 from pnerf.pnerf import dihedral_to_point, point_to_coordinate
-from util import calc_rmsd, calc_drmsd
+from util import calc_rmsd
 
 
 def calculate_dihedral_from_points(points):

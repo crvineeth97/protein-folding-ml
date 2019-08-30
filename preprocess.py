@@ -17,7 +17,7 @@ from preprocess_utils import (
     calculate_omega,
     calculate_phi,
     calculate_psi,
-    calculate_binary_contact_map,
+    build_contact_map,
     masked_select,
     read_protein,
 )
@@ -92,7 +92,7 @@ def process_protein(protein):
     assert len(psi) == masked_length
     omega = calculate_omega(tertiary_masked)
     assert len(omega) == masked_length
-    contact_map = calculate_binary_contact_map(tertiary_masked)
+    contact_map = build_contact_map(tertiary_masked)
     assert len(contact_map) == masked_length
     assert len(contact_map[0]) == masked_length
 

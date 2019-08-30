@@ -114,6 +114,3 @@ extras
 
 # Slurm output files when running on Ada
 slurm*
-
-# Debug files
-debug
