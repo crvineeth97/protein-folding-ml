@@ -1,16 +1,16 @@
 #!/bin/bash
 
-#SBATCH --qos=sub
-#SBATCH -A sub
-#SBATCH -p short
-#SBATCH --time=06:00:00
-#SBATCH -w gnode02
+##SBATCH --qos=sub
+##SBATCH -A sub
+##SBATCH -p short
+##SBATCH --time=06:00:00
+##SBATCH -w gnode02
 
-##SBATCH --qos=medium
-##SBATCH -A research
-##SBATCH -p long
-##SBATCH --time=04-00:00:00
-##SBATCH -w gnode15
+#SBATCH --qos=medium
+#SBATCH -A research
+#SBATCH -p long
+#SBATCH --time=04-00:00:00
+#SBATCH -w gnode06
 
 #SBATCH -n 10
 #SBATCH -N 1
@@ -22,6 +22,9 @@
 
 # Set some environment variables for the current script
 export EXP_NAME="dihedral_predictions"
+export CUDA_LAUNCH_BLOCKING=1
+export CUDA_VISIBLE_DEVICES=0
+export GPU_DEBUG=0
 
 # Copy necessary files to a scratch directory and cd into it
 # rm -rf /scratch/$USER/$EXP_NAME
@@ -37,7 +40,7 @@ rsync -a ada:/share2/$USER/$EXP_NAME/data/preprocessed/testing* ./data/preproces
 rsync -a ada:/share2/$USER/$EXP_NAME/data/preprocessed/validation* ./data/preprocessed
 
 # Run the necessary commands below
-conda activate pyt
+source activate pyt
 # python preprocessing.py
 python main.py "$1"
 # python testing.py
