@@ -106,7 +106,7 @@ class Base(nn.Module):
             running_loss = 0.0
             for _, data in enumerate(self.val_loader):
                 lengths = data["length"]
-                if lengths[0] < 16:
+                if lengths[0] < 32 or lengths[0] > 512:
                     continue
                 inp = self.generate_input(data)
                 target = self.generate_target(data)
@@ -139,7 +139,7 @@ class Base(nn.Module):
             running_train_loss = 0.0
             for batch_iter, data in enumerate(self.train_loader):
                 lengths = data["length"]
-                if lengths[0] < 16:
+                if lengths[0] < 32 or lengths[0] > 512:
                     continue
                 # inp should be of shape [Batch, 123, Max_length, Max_length]
                 inp = self.generate_input(data)
@@ -194,17 +194,10 @@ class Base(nn.Module):
         evolutionary = data["evolutionary"]
         batch_size = len(lengths)
         inp = torch.zeros(
-            batch_size,
-            41 * 3,
-            lengths[0],
-            lengths[0],
-            device=DEVICE,
-            dtype=torch.float32,
+            batch_size, 41 * 3, lengths[0], lengths[0], dtype=torch.float32
         )
 
-        feature_1d = torch.zeros(
-            batch_size, 41, lengths[0], device=DEVICE, dtype=torch.float32
-        )
+        feature_1d = torch.zeros(batch_size, 41, lengths[0], dtype=torch.float32)
 
         for i in range(batch_size):
             feature_1d[i, :20, : lengths[i]] = torch.from_numpy(
@@ -223,8 +216,7 @@ class Base(nn.Module):
                         ),
                         0,
                     )
-
-        return inp
+        return inp.to(DEVICE)
 
     def generate_target(self, data):
         # dihedrals are in radians
