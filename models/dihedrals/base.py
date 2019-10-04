@@ -88,9 +88,10 @@ class Base(nn.Module):
         else:
             self.criterion = criterion
         if optimizer is None:
-            self.optimizer = torch.optim.Adam(self.parameters(), lr=LEARNING_RATE)
+            self.optimizer = torch.optim.SGD(self.parameters(), lr=LEARNING_RATE, momentum=0.9)
         else:
             self.optimizer = optimizer
+        self.scheduler = torch.optim.lr_scheduler.CyclicLR(self.optimizer, base_lr=LEARNING_RATE * 0.25, max_lr=LEARNING_RATE * 2)
         total_params = sum(p.numel() for p in self.parameters())
         train_params = sum(p.numel() for p in self.parameters() if p.requires_grad)
         logging.info("Total number of parameters: %d", total_params)
@@ -206,6 +207,8 @@ class Base(nn.Module):
                 self.optimizer.zero_grad()
                 batch_loss.backward()
                 self.optimizer.step()
+                if self.scheduler != None:
+                    self.scheduler.step()
                 if (batch_iter + 1) % PRINT_LOSS_INTERVAL == 0:
                     logging.info(
                         "[%d|%.2f%%] Train loss: %.10lf",
