@@ -1,16 +1,21 @@
 import logging
 import sys
+
+# import os
 from datetime import timedelta
 from time import time
 
 from constants import DEVICE
-from gpu_profile import gpu_profile
+
+# from gpu_profile import gpu_profile
 
 # from models.dihedrals.resnet_1d import ResNet
 from models.contact_map.unet_2d import UNet
 from preprocess import preprocess_raw_data
 
-sys.settrace(gpu_profile)
+# sys.settrace(gpu_profile)
+# os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+# os.environ["GPU_DEBUG"] = "0"
 
 if len(sys.argv) != 2:
     print("Please provide a description for the model and changes made")

@@ -56,7 +56,7 @@ MASK_DICT = {"-": 0, "+": 1}
 FORCE_PREPROCESSING_OVERWRITE = False
 
 # Hide the visualizaiton of the training
-HIDE_UI = False
+HIDE_UI = True
 
 # If set to True, preprocess proteins that have missing residues in the middle
 PREPROCESS_PROTEIN_WITH_MISSING_RESIDUES = False
