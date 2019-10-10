@@ -187,13 +187,13 @@ class Base(nn.Module):
         """
         lengths = data["length"]
         primary = data["sequence"]
-        evolutionary = data["pssm"]
+        evolutionary = data["PSSM"]
         batch_size = len(lengths)
         inp = torch.zeros(
-            batch_size, 41 * 3, lengths[0], lengths[0], dtype=torch.float32
+            batch_size, 40 * 3, lengths[0], lengths[0], dtype=torch.float32
         )
 
-        feature_1d = torch.zeros(batch_size, 41, lengths[0], dtype=torch.float32)
+        feature_1d = torch.zeros(batch_size, 40, lengths[0], dtype=torch.float32)
 
         for i in range(batch_size):
             feature_1d[i, :20, : lengths[i]] = torch.from_numpy(

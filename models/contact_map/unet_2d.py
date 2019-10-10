@@ -11,7 +11,7 @@ from constants import DEVICE
 class UNet(Base):
     def __init__(
         self,
-        in_channels=123,
+        in_channels=40 * 3,
         n_classes=1,
         depth=4,
         wf=7,

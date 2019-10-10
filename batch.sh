@@ -21,7 +21,7 @@
 #SBATCH --mail-user=ravindrachelur.v@research.iiit.ac.in
 
 # Set some environment variables for the current script
-export EXP_NAME="dihedral_predictions"
+export EXP_NAME="raptor_contact"
 export CUDA_LAUNCH_BLOCKING=1
 export CUDA_VISIBLE_DEVICES=0
 export GPU_DEBUG=0
@@ -32,15 +32,11 @@ mkdir -p /scratch/$USER/$EXP_NAME
 rsync -a ./ /scratch/$USER/$EXP_NAME
 cd /scratch/$USER/$EXP_NAME
 
-# rsync -a ada:/share2/$USER/data/casp12/training_30 ./data/raw/
-# rsync -a ada:/share2/$USER/data/casp12/validation ./data/raw/
-# rsync -a ada:/share2/$USER/data/casp12/testing ./data/raw/
-rsync -a ada:/share2/$USER/$EXP_NAME/data/preprocessed/training_30* ./data/preprocessed
-rsync -a ada:/share2/$USER/$EXP_NAME/data/preprocessed/testing* ./data/preprocessed
-rsync -a ada:/share2/$USER/$EXP_NAME/data/preprocessed/validation* ./data/preprocessed
+rsync -a ada:/share2/$USER/data/RaptorX_contact_prediction/pdb25* ./data/raw/
 
 # Run the necessary commands below
 source activate pyt
+git checkout raptor-old
 # python preprocessing.py
 python main.py "$1"
 # python testing.py
