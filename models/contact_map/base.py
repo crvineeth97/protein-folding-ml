@@ -15,10 +15,10 @@ from constants import (
     MINIBATCH_SIZE,
     PREPROCESS_PROTEIN_WITH_MISSING_RESIDUES,
     PRINT_LOSS_INTERVAL,
-    TEST_FOLDER,
+    TEST_FILE,
     TRAIN_EPOCHS,
-    TRAIN_FOLDER,
-    VAL_FOLDER,
+    TRAIN_FILE,
+    VAL_FILE,
 )
 from dataloader import contruct_dataloader_from_disk
 from visualize import ContactMap
@@ -32,9 +32,9 @@ class Base(nn.Module):
         self.init_logging()
 
     def init_model_vars(self):
-        self.val_loader = contruct_dataloader_from_disk(VAL_FOLDER, "contact_map")
-        self.test_loader = contruct_dataloader_from_disk(TEST_FOLDER, "contact_map")
-        self.train_loader = contruct_dataloader_from_disk(TRAIN_FOLDER, "contact_map")
+        self.val_loader = contruct_dataloader_from_disk(VAL_FILE, "contact_map")
+        self.test_loader = contruct_dataloader_from_disk(TEST_FILE, "contact_map")
+        self.train_loader = contruct_dataloader_from_disk(TRAIN_FILE, "contact_map")
         self.val_size = self.val_loader.__len__()
         self.test_size = self.test_loader.__len__()
         self.train_size = self.train_loader.__len__()
@@ -106,8 +106,6 @@ class Base(nn.Module):
             running_loss = 0.0
             for _, data in enumerate(self.val_loader):
                 lengths = data["length"]
-                if lengths[0] < 32 or lengths[0] > 512:
-                    continue
                 inp = self.generate_input(data)
                 target = self.generate_target(data)
                 output = self(inp, lengths)
@@ -139,8 +137,6 @@ class Base(nn.Module):
             running_train_loss = 0.0
             for batch_iter, data in enumerate(self.train_loader):
                 lengths = data["length"]
-                if lengths[0] < 32 or lengths[0] > 512:
-                    continue
                 # inp should be of shape [Batch, 123, Max_length, Max_length]
                 inp = self.generate_input(data)
                 # target should be of shape [Batch, Max_length, Max_length]
@@ -175,7 +171,7 @@ class Base(nn.Module):
                         output = output.detach().cpu().numpy()[0]
                         if not visualize:
                             visualize = ContactMap()
-                        visualize.plot_contact_map(data["id"], output)
+                        visualize.plot_contact_map(data["name"], output)
                     logging.info("\tValidation loss: %.10lf", val_loss)
             epoch_train_loss = exact_metric(epoch_train_loss, batch_loss.item())
             logging.info("Epoch train loss: %.10lf", epoch_train_loss)
@@ -190,8 +186,8 @@ class Base(nn.Module):
         so that the final input shape is [MINIBATCH_SIZE, Channels, Max_length, Max_length]
         """
         lengths = data["length"]
-        primary = data["primary"]
-        evolutionary = data["evolutionary"]
+        primary = data["sequence"]
+        evolutionary = data["pssm"]
         batch_size = len(lengths)
         inp = torch.zeros(
             batch_size, 41 * 3, lengths[0], lengths[0], dtype=torch.float32
@@ -221,7 +217,7 @@ class Base(nn.Module):
     def generate_target(self, data):
         # dihedrals are in radians
         lengths = data["length"]
-        contact_map = data["contact_map"]
+        contact_map = data["contactMatrix"]
         batch_size = len(lengths)
         target = torch.zeros(
             batch_size, lengths[0], lengths[0], device=DEVICE, dtype=torch.float32

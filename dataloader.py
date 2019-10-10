@@ -1,21 +1,20 @@
-from os import listdir
-
 import numpy as np
+import pickle
 from torch.utils.data import DataLoader, Dataset
 
 from constants import MINIBATCH_SIZE
 
 
 def contruct_dataloader_from_disk(
-    foldername, set_name="dihedrals", batch_size=MINIBATCH_SIZE
+    filename, set_name="dihedrals", batch_size=MINIBATCH_SIZE
 ):
-    wanted_data = ["id", "primary", "evolutionary"]
+    wanted_data = ["name", "sequence", "PSSM", "OtherPairs"]
     if set_name == "contact_map":
-        wanted_data.extend(["contact_map"])
+        wanted_data.extend(["contactMatrix"])
     else:
         wanted_data.extend(["phi", "psi", "omega"])
     return DataLoader(
-        dataset=ProteinNet(foldername, wanted_data),
+        dataset=RaptorX(filename, wanted_data),
         batch_size=batch_size,
         shuffle=True,
         collate_fn=merge_samples_to_minibatch,
@@ -23,23 +22,21 @@ def contruct_dataloader_from_disk(
     )
 
 
-class ProteinNet(Dataset):
-    def __init__(self, foldername, wanted_data):
-        super(ProteinNet, self).__init__()
-        self.foldername = foldername
+class RaptorX(Dataset):
+    def __init__(self, filename, wanted_data):
+        super(RaptorX, self).__init__()
+        with open(filename, "rb") as f:
+            self.proteins = pickle.load(f, encoding="latin1")
         self.wanted_data = wanted_data
-        self.filenames = listdir(foldername)
 
     def __getitem__(self, index):
-        protein = np.load(self.foldername + self.filenames[index])
+        protein = self.proteins[index]
         sample = dict((k, protein[k]) for k in self.wanted_data if k in protein)
-        sample["length"] = protein["primary"].shape[0]
-        if "validation" in self.foldername or "testing" in self.foldername:
-            sample["tertiary"] = protein["tertiary"]
+        sample["length"] = protein["sequence"].shape[0]
         return sample
 
     def __len__(self):
-        return len(self.filenames)
+        return len(self.proteins)
 
 
 def merge_samples_to_minibatch(samples):

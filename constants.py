@@ -62,13 +62,13 @@ HIDE_UI = False
 PREPROCESS_PROTEIN_WITH_MISSING_RESIDUES = False
 
 # Folder containing training data
-TRAIN_FOLDER = "data/preprocessed/training_30_no_missing/"
+TRAIN_FILE = "data/raw/pdb25-6767-train.release.contactFeatures.pkl"
 
 # Folder containing validation data
-VAL_FOLDER = "data/preprocessed/validation_no_missing/"
+VAL_FILE = "data/raw/pdb25-6767-valid.release.contactFeatures.pkl"
 
 # Folder containing testing data
-TEST_FOLDER = "data/preprocessed/testing_no_missing/"
+TEST_FILE = "data/raw/pdb25-test-500.release.contactFeatures.pkl"
 
 # Which device to use for tensor computations
 DEVICE = device("cpu")
