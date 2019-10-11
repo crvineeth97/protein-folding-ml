@@ -13,7 +13,7 @@ from constants import (
     FORCE_PREPROCESSING_OVERWRITE,
     PREPROCESS_PROTEIN_WITH_MISSING_RESIDUES,
 )
-from preprocess_utils import (
+from proteinnet_preprocess_utils import (
     calculate_omega,
     calculate_phi,
     calculate_psi,
@@ -111,7 +111,7 @@ def process_protein(protein):
 
 def process_file(input_file, output_folder):
     logging.info("Processing raw data file %s", input_file)
-    input_file_pointer = open("data/raw/" + input_file, "r")
+    input_file_pointer = open("data/proteinnet_raw/" + input_file, "r")
     idx = 0
     total_read_time = 0
     total_process_time = 0
@@ -187,10 +187,10 @@ def filter_input_files(input_files):
 def preprocess_raw_data():
     logging.info("Starting pre-processing of raw data...")
 
-    input_files = listdir("data/raw/")
+    input_files = listdir("data/proteinnet_raw/")
     input_files_filtered = filter_input_files(input_files)
     for filename in input_files_filtered:
-        preprocessed_folder_path = "data/preprocessed/" + filename + "/"
+        preprocessed_folder_path = "data/proteinnet_preprocessed/" + filename + "/"
         if not PREPROCESS_PROTEIN_WITH_MISSING_RESIDUES:
             preprocessed_folder_path = preprocessed_folder_path[:-1] + "_no_missing/"
         if FORCE_PREPROCESSING_OVERWRITE:

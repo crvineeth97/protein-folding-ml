@@ -62,13 +62,13 @@ HIDE_UI = True
 PREPROCESS_PROTEIN_WITH_MISSING_RESIDUES = False
 
 # Folder containing training data
-TRAIN_FOLDER = "data/preprocessed/training_30_no_missing/"
+TRAIN_FOLDER = "data/proteinnet_preprocessed/training_30_no_missing/"
 
 # Folder containing validation data
-VAL_FOLDER = "data/preprocessed/validation_no_missing/"
+VAL_FOLDER = "data/proteinnet_preprocessed/validation_no_missing/"
 
 # Folder containing testing data
-TEST_FOLDER = "data/preprocessed/testing_no_missing/"
+TEST_FOLDER = "data/proteinnet_preprocessed/testing_no_missing/"
 
 # Which device to use for tensor computations
 DEVICE = device("cpu")

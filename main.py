@@ -11,7 +11,7 @@ from constants import DEVICE
 
 # from models.dihedrals.resnet_1d import ResNet
 from models.contact_map.unet_2d import UNet
-from preprocess import preprocess_raw_data
+from proteinnet_preprocess import preprocess_raw_data
 
 # sys.settrace(gpu_profile)
 # os.environ["CUDA_VISIBLE_DEVICES"] = "1"
