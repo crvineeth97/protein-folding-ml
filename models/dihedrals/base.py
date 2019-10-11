@@ -50,7 +50,7 @@ class Base(nn.Module):
 
     def init_output_dir(self):
         self.model_name = datetime.now().strftime("%Y-%m-%d %H_%M_%S")
-        self.model_dir = "output/di/" + self.model_name + "/"
+        self.model_dir = "output/dihedrals/" + self.model_name + "/"
         os.makedirs(self.model_dir)
         os.makedirs(self.model_dir + "code/")
         # Keep a copy of .sh and .py files in the model's code

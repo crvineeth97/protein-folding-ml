@@ -56,19 +56,19 @@ MASK_DICT = {"-": 0, "+": 1}
 FORCE_PREPROCESSING_OVERWRITE = False
 
 # Hide the visualizaiton of the training
-HIDE_UI = False
+HIDE_UI = True
 
 # If set to True, preprocess proteins that have missing residues in the middle
 PREPROCESS_PROTEIN_WITH_MISSING_RESIDUES = False
 
 # Folder containing training data
-TRAIN_FILE = "data/raw/pdb25-6767-train.release.contactFeatures.pkl"
+TRAIN_FILE = "data/raptorx_pickle/pdb25-6767-train.release.contactFeatures.pkl"
 
 # Folder containing validation data
-VAL_FILE = "data/raw/pdb25-6767-valid.release.contactFeatures.pkl"
+VAL_FILE = "data/raptorx_pickle/pdb25-6767-valid.release.contactFeatures.pkl"
 
 # Folder containing testing data
-TEST_FILE = "data/raw/pdb25-test-500.release.contactFeatures.pkl"
+TEST_FILE = "data/raptorx_pickle/pdb25-test-500.release.contactFeatures.pkl"
 
 # Which device to use for tensor computations
 DEVICE = device("cpu")

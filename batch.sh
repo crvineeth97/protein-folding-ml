@@ -21,18 +21,26 @@
 #SBATCH --mail-user=ravindrachelur.v@research.iiit.ac.in
 
 # Set some environment variables for the current script
-export EXP_NAME="raptor_contact"
+export EXP_NAME="protein_folding"
 export CUDA_LAUNCH_BLOCKING=1
 export CUDA_VISIBLE_DEVICES=0
 export GPU_DEBUG=0
 
-# Copy necessary files to a scratch directory and cd into it
-# rm -rf /scratch/$USER/$EXP_NAME
-mkdir -p /scratch/$USER/$EXP_NAME
-rsync -a ./ /scratch/$USER/$EXP_NAME
-cd /scratch/$USER/$EXP_NAME
+# Remove previous copy of the repository
+rm -rf /scratch/$USER/$EXP_NAME
 
-rsync -a ada:/share2/$USER/data/RaptorX_contact_prediction/pdb25* ./data/raw/
+# Copy the data required
+mkdir -p /scratch/$USER/$EXP_NAME/data
+cd /scratch/$USER/$EXP_NAME
+# rsync -a ada:/share2/$USER/data/casp12/training_30 ./data/proteinnet_raw
+# rsync -a ada:/share2/$USER/data/casp12/validation ./data/proteinnet_raw
+# rsync -a ada:/share2/$USER/data/casp12/testing ./data/proteinnet_raw
+rsync -a ada:/share2/$USER/$EXP_NAME/data/casp12/preprocessed/training_30* ./data/proteinnet_preprocessed
+rsync -a ada:/share2/$USER/$EXP_NAME/data/casp12/preprocessed/testing* ./data/proteinnet_preprocessed
+rsync -a ada:/share2/$USER/$EXP_NAME/data/casp12/preprocessed/validation* ./data/proteinnet_preprocessed
+
+# Copy the source code
+rsync -a zeus@10.2.12.106:/home/zeus/Git/protein-folding-ml/ /scratch/$USER/$EXP_NAME
 
 # Run the necessary commands below
 source activate pyt
@@ -42,4 +50,4 @@ python main.py "$1"
 # python testing.py
 conda deactivate
 
-rsync -a ./ ada:/share2/$USER/$EXP_NAME
+rsync -a ./output/ ada:/share2/$USER/outputs/
